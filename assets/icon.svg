@@ -1,0 +1,37 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <!-- Vector twin of ref/logo.jpeg; artwork is drawn in a 64-unit grid (shared with src/components/Logo.svelte). -->
+  <defs>
+    <linearGradient id="steam" x1="0" y1="11" x2="0" y2="26.5" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#e8b573"/>
+      <stop offset="1" stop-color="#fee7bd"/>
+    </linearGradient>
+    <mask id="cup" maskUnits="userSpaceOnUse" x="0" y="0" width="64" height="64">
+      <rect width="64" height="64" fill="#fff"/>
+      <path d="M21.2 31.3V34.8A10.9 10.9 0 0 0 25.7 43" fill="none" stroke="#000" stroke-width="1.6" stroke-linecap="round"/>
+    </mask>
+    <mask id="rings" maskUnits="userSpaceOnUse" x="0" y="0" width="64" height="64">
+      <rect width="64" height="64" fill="#fff"/>
+      <path d="M18 28.3H46V34A14 14 0 0 1 18 34Z" fill="#000" stroke="#000" stroke-width="2.2" stroke-linejoin="round"/>
+    </mask>
+  </defs>
+  <rect x="56" y="56" width="912" height="912" rx="206" fill="#352c2a"/>
+  <g transform="translate(56 56) scale(14.25)">
+    <g fill="url(#steam)">
+      <rect x="22.5" y="20.4" width="2.4" height="6.1" rx="1.2"/>
+      <rect x="26.6" y="17.2" width="2.4" height="9.3" rx="1.2"/>
+      <rect x="30.8" y="11.4" width="2.4" height="15.1" rx="1.2"/>
+      <rect x="34.9" y="15.2" width="2.4" height="11.3" rx="1.2"/>
+      <rect x="39" y="18.7" width="2.4" height="7.8" rx="1.2"/>
+    </g>
+    <g fill="none" stroke="#fee8c3" stroke-width="0.75" mask="url(#rings)">
+      <ellipse cx="32" cy="47.9" rx="20.5" ry="4.45"/>
+      <ellipse cx="32" cy="48" rx="17.25" ry="3.5"/>
+      <ellipse cx="32" cy="48.05" rx="14" ry="2.65"/>
+      <ellipse cx="32" cy="48.05" rx="10.75" ry="1.65"/>
+    </g>
+    <g mask="url(#cup)" fill="#fee8c3">
+      <path d="M18 28.3H46V34A14 14 0 0 1 18 34Z"/>
+      <path d="M45 31.75h2a4.25 4.25 0 0 1 0 8.5h-3.2" fill="none" stroke="#fee8c3" stroke-width="2.4"/>
+    </g>
+  </g>
+</svg>
