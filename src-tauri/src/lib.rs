@@ -8,7 +8,7 @@ use parking_lot::{Mutex, RwLock};
 use rusqlite::Connection;
 use tauri::{AppHandle, Emitter, Manager, State};
 
-use library::{db, scan};
+use library::{db, scan, Collection, FolderView, Home, Tile};
 use settings::Settings;
 
 type Res<T> = Result<T, String>;
@@ -94,6 +94,27 @@ fn rescan(app: AppHandle) {
     rescan_now(&app);
 }
 
+#[tauri::command]
+async fn get_home(st: State<'_, AppState>) -> Res<Home> {
+    library::home(&st.db.lock()).map_err(err)
+}
+
+#[tauri::command]
+async fn get_roots(st: State<'_, AppState>) -> Res<Vec<Tile>> {
+    let roots = st.settings.read().roots.clone();
+    library::root_tiles(&st.db.lock(), &roots).map_err(err)
+}
+
+#[tauri::command]
+async fn get_folder(st: State<'_, AppState>, path: String) -> Res<FolderView> {
+    library::folder_view(&st.db.lock(), &path).map_err(err)
+}
+
+#[tauri::command]
+async fn get_collection(st: State<'_, AppState>, kind: String, id: String) -> Res<Collection> {
+    library::collection(&st.db.lock(), &kind, &id).map_err(err)
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -135,6 +156,10 @@ pub fn run() {
             get_settings,
             set_settings,
             rescan,
+            get_home,
+            get_roots,
+            get_folder,
+            get_collection,
         ])
         .run(tauri::generate_context!())
         .expect("error while running Coff-fi");
