@@ -4,7 +4,7 @@
   import TileC from "../components/Tile.svelte";
   import VirtualList from "../components/VirtualList.svelte";
   import { api } from "../lib/ipc";
-  import { conf, toast, ui } from "../lib/state.svelte";
+  import { conf, playTracks, toast, ui } from "../lib/state.svelte";
   import type { Home, Tile } from "../lib/types";
 
   let { scroller }: { scroller: HTMLElement | null } = $props();
@@ -89,7 +89,7 @@
       </div>
       <VirtualList items={data.songs} rowHeight={56} {scroller}>
         {#snippet row(t, i)}
-          <SongRow track={t} index={i} />
+          <SongRow track={t} index={i} onplay={() => data && playTracks(data.songs, i, "All Songs")} />
         {/snippet}
       </VirtualList>
     </section>

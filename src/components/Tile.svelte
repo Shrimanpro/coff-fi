@@ -1,7 +1,8 @@
 <script lang="ts">
-  import { openTile } from "../lib/state.svelte";
+  import { clicks, openTile, playTile } from "../lib/state.svelte";
   import type { Tile } from "../lib/types";
   import Cover from "./Cover.svelte";
+  import Icon from "./Icon.svelte";
 
   let { tile, size = 256 }: { tile: Tile; size?: number } = $props();
   const round = $derived(tile.kind === "artist");
@@ -13,11 +14,21 @@
   class:round
   role="button"
   tabindex="0"
-  onclick={() => openTile(tile)}
+  use:clicks={{ single: () => openTile(tile), double: () => playTile(tile) }}
   onkeydown={(e) => e.key === "Enter" && openTile(tile)}
 >
   <div class="art">
     <Cover covers={tile.covers} {size} radius={14} {round} {icon} />
+    <button
+      class="play"
+      aria-label="Play {tile.name}"
+      onclick={(e) => {
+        e.stopPropagation();
+        playTile(tile);
+      }}
+    >
+      <Icon name="play" size={20} />
+    </button>
   </div>
   <div class="name ellipsis" title={tile.name}>{tile.name}</div>
   <div class="sub ellipsis">{tile.subtitle}</div>

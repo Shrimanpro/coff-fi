@@ -1,4 +1,6 @@
+mod audio;
 mod library;
+mod queue;
 mod settings;
 
 use std::cell::RefCell;
@@ -10,7 +12,9 @@ use rusqlite::Connection;
 use tauri::http::{Request, Response, StatusCode};
 use tauri::{AppHandle, Emitter, Manager, State};
 
+use audio::{Cmd, Event, Player, Status};
 use library::{covers, db, scan, Collection, FolderView, Home, Tile};
+use queue::Queue;
 use settings::Settings;
 
 type Res<T> = Result<T, String>;
@@ -25,6 +29,7 @@ pub struct AppState {
     /// Settings always live in the local database, whichever library is active.
     cfg_db: Mutex<Connection>,
     settings: RwLock<Settings>,
+    player: Player,
     scanning: AtomicBool,
     rescan_pending: AtomicBool,
 }
@@ -46,10 +51,25 @@ fn set_settings(app: AppHandle, st: State<AppState>, settings: Settings) -> Res<
     let mut s = settings;
     save_settings(&st.cfg_db.lock(), &s)?;
     *st.settings.write() = s.clone();
+    if s.volume != old.volume {
+        st.player.send(Cmd::Volume(s.volume));
+    }
     if s.roots != old.roots || s.excluded != old.excluded {
         rescan_now(&app);
     }
     Ok(())
+}
+
+/// Volume changes arrive at slider speed, so they skip the full settings round-trip.
+#[tauri::command]
+fn set_volume(st: State<AppState>, volume: f32) -> Res<()> {
+    st.player.send(Cmd::Volume(volume));
+    let s = {
+        let mut s = st.settings.write();
+        s.volume = volume.clamp(0.0, 1.0);
+        s.clone()
+    };
+    save_settings(&st.cfg_db.lock(), &s)
 }
 
 // ---------- library ----------
@@ -117,6 +137,46 @@ async fn get_collection(st: State<'_, AppState>, kind: String, id: String) -> Re
     library::collection(&st.db.lock(), &kind, &id).map_err(err)
 }
 
+// ---------- queue & playback ----------
+
+#[tauri::command]
+fn play_tracks(app: AppHandle, st: State<AppState>, ids: Vec<i64>, start: usize, name: String) -> Res<()> {
+    if ids.is_empty() {
+        return Ok(());
+    }
+    let id = {
+        let mut q = st.player.queue.lock();
+        q.set(name, ids.clone(), start);
+        // With shuffle on, `set` moves the chosen track to the front.
+        q.current()
+    };
+    if let Some(id) = id {
+        st.player.send(Cmd::Load { id, start: 0.0, play: true });
+    }
+    Ok(())
+}
+
+#[tauri::command]
+fn player_cmd(st: State<AppState>, cmd: String, value: Option<f64>) -> Res<()> {
+    let c = match cmd.as_str() {
+        "toggle" => Cmd::Toggle,
+        "play" => Cmd::SetPlaying(true),
+        "pause" => Cmd::SetPlaying(false),
+        "next" => Cmd::Next,
+        "prev" => Cmd::Prev,
+        "stop" => Cmd::Stop,
+        "seek" => Cmd::Seek(value.unwrap_or(0.0)),
+        _ => return Err(format!("unknown command {cmd}")),
+    };
+    st.player.send(c);
+    Ok(())
+}
+
+#[tauri::command]
+fn get_status(st: State<AppState>) -> Status {
+    st.player.status.read().clone()
+}
+
 // ---------- cover protocol ----------
 
 thread_local! {
@@ -171,6 +231,25 @@ fn cover_response(req: &Request<Vec<u8>>) -> Response<Vec<u8>> {
     }
 }
 
+// ---------- events ----------
+
+fn on_player_event(app: &AppHandle, e: Event) {
+    let st = app.state::<AppState>();
+    match e {
+        Event::State(s) => {
+                let _ = app.emit("player://state", s);
+        }
+        Event::Track(id) => {
+            let track = id.and_then(|id| db::track(&st.db.lock(), id).ok().flatten());
+            let _ = app.emit("player://track", &track);
+            let _ = app.emit("queue://changed", ());
+        }
+        Event::Error(msg) => {
+            let _ = app.emit("app://error", msg);
+        }
+    }
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -201,7 +280,10 @@ pub fn run() {
             let db_path = local_path.clone();
             *ACTIVE_DB.write() = Some(db_path.clone());
             let conn = db::open(&db_path)?;
+            let q = Queue::default();
 
+            let h = app.handle().clone();
+            let player = Player::spawn(db_path.clone(), &s, q, move |e| on_player_event(&h, e));
 
 
             app.manage(AppState {
@@ -209,6 +291,7 @@ pub fn run() {
                 db_path: RwLock::new(db_path),
                 cfg_db: Mutex::new(cfg_conn),
                 settings: RwLock::new(s),
+                player,
                 scanning: AtomicBool::new(false),
                 rescan_pending: AtomicBool::new(false),
             });
@@ -218,11 +301,15 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             get_settings,
             set_settings,
+            set_volume,
             rescan,
             get_home,
             get_roots,
             get_folder,
             get_collection,
+            play_tracks,
+            player_cmd,
+            get_status,
         ])
         .run(tauri::generate_context!())
         .expect("error while running Coff-fi");

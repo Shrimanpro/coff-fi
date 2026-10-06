@@ -5,7 +5,7 @@
   import TileC from "../components/Tile.svelte";
   import VirtualList from "../components/VirtualList.svelte";
   import { api } from "../lib/ipc";
-  import { conf, toast, ui } from "../lib/state.svelte";
+  import { conf, playTracks, toast, ui } from "../lib/state.svelte";
   import type { FolderView, Tile } from "../lib/types";
 
   let { scroller }: { scroller: HTMLElement | null } = $props();
@@ -53,6 +53,9 @@
     return parts.join(" · ");
   });
 
+  async function all() {
+    return data ? (await api.collection("folder", data.path)).tracks : [];
+  }
 </script>
 
 <div class="dir">
@@ -79,6 +82,9 @@
         <span class="eyebrow">Folder</span>
         <h1>{data.name}</h1>
         <p class="sub">{summary}</p>
+        <div class="actions">
+          <button class="pill-btn" onclick={async () => playTracks(await all(), 0, data!.name)}><Icon name="play" size={16} /> Play</button>
+        </div>
       </div>
     </header>
 
@@ -97,7 +103,7 @@
       </div>
       <VirtualList items={data.tracks} rowHeight={56} {scroller}>
         {#snippet row(t, i)}
-          <SongRow track={t} index={i} />
+          <SongRow track={t} index={i} onplay={() => data && playTracks(data.tracks, i, data.name)} />
         {/snippet}
       </VirtualList>
     {/if}

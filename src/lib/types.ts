@@ -50,6 +50,13 @@ export interface Collection {
   tracks: Track[];
 }
 
+export interface Status {
+  track_id: number | null;
+  playing: boolean;
+  position: number;
+  duration: number;
+}
+
 export interface Settings {
   roots: string[];
   excluded: string[];

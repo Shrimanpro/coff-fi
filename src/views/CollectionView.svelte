@@ -4,7 +4,7 @@
   import SongRow from "../components/SongRow.svelte";
   import VirtualList from "../components/VirtualList.svelte";
   import { api } from "../lib/ipc";
-  import { toast, ui } from "../lib/state.svelte";
+  import { playTracks, toast, ui } from "../lib/state.svelte";
   import type { Collection } from "../lib/types";
 
   let { kind, id, scroller }: { kind: string; id: string; scroller: HTMLElement | null } = $props();
@@ -29,11 +29,15 @@
         <span class="eyebrow">{label}</span>
         <h1>{data.title}</h1>
         <p class="sub">{data.subtitle} · {Math.round(total / 60)} min</p>
+        <div class="actions">
+          <button class="pill-btn" disabled={!data.tracks.length} onclick={() => data && playTracks(data.tracks, 0, data.title)}><Icon name="play" size={16} /> Play</button>
+        </div>
+      </div>
     </header>
     {#if data.tracks.length}
       <VirtualList items={data.tracks} rowHeight={56} {scroller}>
         {#snippet row(t, i)}
-          <SongRow track={t} index={i} showArt={!isAlbum} showAlbum={!isAlbum} />
+          <SongRow track={t} index={i} showArt={!isAlbum} showAlbum={!isAlbum} onplay={() => data && playTracks(data.tracks, i, data.title)} />
         {/snippet}
       </VirtualList>
     {:else}

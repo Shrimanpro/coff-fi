@@ -2,13 +2,15 @@
   import { time } from "../lib/format";
   import type { Track } from "../lib/types";
   import Cover from "./Cover.svelte";
+  import Icon from "./Icon.svelte";
 
   let {
     track,
     index,
     showArt = true,
     showAlbum = true,
-  }: { track: Track; index: number; showArt?: boolean; showAlbum?: boolean } = $props();
+    onplay,
+  }: { track: Track; index: number; showArt?: boolean; showAlbum?: boolean; onplay: () => void } = $props();
 
 </script>
 
@@ -16,6 +18,8 @@
   class="row"
   role="button"
   tabindex="-1"
+  ondblclick={onplay}
+  onkeydown={(e) => e.key === "Enter" && onplay()}
 >
   <div class="lead">
     {#if showArt}
@@ -23,6 +27,7 @@
     {:else}
       <span class="num">{track.track_no ?? index + 1}</span>
     {/if}
+      <button class="hover-play" aria-label="Play" onclick={onplay}><Icon name="play" size={14} /></button>
   </div>
   <div class="main">
     <div class="title ellipsis">{track.title}</div>

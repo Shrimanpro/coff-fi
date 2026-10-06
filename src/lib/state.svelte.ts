@@ -37,10 +37,28 @@ export async function init() {
       ui.libVersion++;
     }),
     listen<boolean>("library://scanning", (e) => (ui.scanning = e.payload)),
+    listen<string>("app://error", (e) => toast(e.payload)),
   ]);
 }
 
 // ---------- actions ----------
+
+export function playTracks(tracks: Track[], start: number, name: string) {
+  if (!tracks.length) return;
+  api.playTracks(
+    tracks.map((t) => t.id),
+    start,
+    name,
+  ).catch((e) => toast(String(e)));
+}
+
+export async function tileTracks(t: Tile): Promise<Track[]> {
+  return (await api.collection(t.kind, t.id)).tracks;
+}
+
+export async function playTile(t: Tile) {
+  playTracks(await tileTracks(t), 0, t.name);
+}
 
 export function openTile(t: Tile) {
   if (t.kind === "folder") {
