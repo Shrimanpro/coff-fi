@@ -13,6 +13,7 @@ export interface Track {
   sample_rate: number | null;
   bit_depth: number | null;
   bitrate: number | null;
+  cover: string | null;
 }
 
 export type TileKind = "playlist" | "album" | "artist" | "folder";

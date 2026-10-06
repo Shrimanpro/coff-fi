@@ -1,9 +1,11 @@
 <script lang="ts">
   import { openTile } from "../lib/state.svelte";
   import type { Tile } from "../lib/types";
+  import Cover from "./Cover.svelte";
 
   let { tile, size = 256 }: { tile: Tile; size?: number } = $props();
   const round = $derived(tile.kind === "artist");
+  const icon = $derived(tile.kind === "folder" ? "folder" : "music");
 </script>
 
 <div
@@ -15,7 +17,7 @@
   onkeydown={(e) => e.key === "Enter" && openTile(tile)}
 >
   <div class="art">
-    <div style:aspect-ratio="1" style:border-radius={round ? "50%" : "14px"} style:background="var(--placeholder)"></div>
+    <Cover covers={tile.covers} {size} radius={14} {round} {icon} />
   </div>
   <div class="name ellipsis" title={tile.name}>{tile.name}</div>
   <div class="sub ellipsis">{tile.subtitle}</div>

@@ -1,4 +1,5 @@
 <script lang="ts">
+  import Cover from "../components/Cover.svelte";
   import Icon from "../components/Icon.svelte";
   import SongRow from "../components/SongRow.svelte";
   import VirtualList from "../components/VirtualList.svelte";
@@ -23,6 +24,7 @@
   <button class="back" onclick={() => (ui.collection = null)}><Icon name="chev-left" size={16} /> Back</button>
   {#if data}
     <header>
+      <div class="art"><Cover covers={data.covers} size={640} radius={14} round={kind === "artist"} /></div>
       <div class="info">
         <span class="eyebrow">{label}</span>
         <h1>{data.title}</h1>

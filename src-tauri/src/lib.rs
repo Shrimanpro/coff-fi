@@ -1,14 +1,16 @@
 mod library;
 mod settings;
 
-use std::path::PathBuf;
+use std::cell::RefCell;
+use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, Ordering};
 
 use parking_lot::{Mutex, RwLock};
 use rusqlite::Connection;
+use tauri::http::{Request, Response, StatusCode};
 use tauri::{AppHandle, Emitter, Manager, State};
 
-use library::{db, scan, Collection, FolderView, Home, Tile};
+use library::{covers, db, scan, Collection, FolderView, Home, Tile};
 use settings::Settings;
 
 type Res<T> = Result<T, String>;
@@ -115,14 +117,74 @@ async fn get_collection(st: State<'_, AppState>, kind: String, id: String) -> Re
     library::collection(&st.db.lock(), &kind, &id).map_err(err)
 }
 
+// ---------- cover protocol ----------
+
+thread_local! {
+    static PROTO_CONN: RefCell<Option<(Connection, PathBuf)>> = const { RefCell::new(None) };
+}
+
+static THUMBS: std::sync::OnceLock<PathBuf> = std::sync::OnceLock::new();
+/// The active library database; cover-serving threads reconnect when it changes.
+static ACTIVE_DB: RwLock<Option<PathBuf>> = parking_lot::const_rwlock(None);
+
+fn with_proto_conn<T>(cell: &RefCell<Option<(Connection, PathBuf)>>, f: impl FnOnce(&Connection, &Path) -> anyhow::Result<T>) -> anyhow::Result<T> {
+    let mut slot = cell.borrow_mut();
+    let active = ACTIVE_DB.read().clone().ok_or_else(|| anyhow::anyhow!("not initialised"))?;
+    if slot.as_ref().is_none_or(|(_, p)| *p != active) {
+        *slot = Some((db::open(&active)?, active));
+    }
+    let thumbs = THUMBS.get().ok_or_else(|| anyhow::anyhow!("not initialised"))?;
+    let (c, _) = slot.as_ref().expect("initialised above");
+    f(c, thumbs)
+}
+
+/// `coffi://localhost/cover/<hash>/<size>`, `/collage/<h1,h2,..>/<size>`, `/blur/<hash>`.
+fn serve_cover(path: &str) -> anyhow::Result<Vec<u8>> {
+    let decoded = urlencoding::decode(path)?.into_owned();
+    let parts: Vec<&str> = decoded.trim_start_matches('/').split('/').collect();
+    let file = PROTO_CONN.with(|c| {
+        with_proto_conn(c, |conn, thumbs| match parts.as_slice() {
+            ["cover", h, size] => covers::thumb(conn, thumbs, h, size.parse().unwrap_or(256)),
+            ["collage", hs, size] => {
+                let hs: Vec<String> = hs.split(',').filter(|s| !s.is_empty()).map(String::from).collect();
+                covers::collage(conn, thumbs, &hs, size.parse().unwrap_or(256))
+            }
+            ["blur", h] => covers::blurred(conn, thumbs, h),
+            _ => Err(anyhow::anyhow!("bad cover path")),
+        })
+    })?;
+    Ok(std::fs::read(file)?)
+}
+
+fn cover_response(req: &Request<Vec<u8>>) -> Response<Vec<u8>> {
+    let builder = Response::builder().header("Access-Control-Allow-Origin", "*");
+    // convertFileSrc() percent-encodes the whole path, slashes included.
+    let path = urlencoding::decode(req.uri().path()).map(|p| p.into_owned()).unwrap_or_default();
+    let result = serve_cover(&path);
+    match result {
+        Ok(bytes) => builder
+            .header("Content-Type", "image/jpeg")
+            .header("Cache-Control", "public, max-age=31536000, immutable")
+            .body(bytes)
+            .unwrap_or_default(),
+        Err(_) => builder.status(StatusCode::NOT_FOUND).body(Vec::new()).unwrap_or_default(),
+    }
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
+        .register_asynchronous_uri_scheme_protocol("coffi", |_ctx, req, responder| {
+            rayon::spawn(move || responder.respond(cover_response(&req)));
+        })
         .setup(|app| {
             let data = app.path().app_data_dir()?;
+            let thumbs = app.path().app_cache_dir()?.join("thumbs");
             std::fs::create_dir_all(&data)?;
+            std::fs::create_dir_all(&thumbs)?;
             let local_path = data.join("library.db");
+            let _ = THUMBS.set(thumbs.clone());
             let cfg_conn = db::open(&local_path)?;
             let conn = &cfg_conn;
 
@@ -137,6 +199,7 @@ pub fn run() {
             }
 
             let db_path = local_path.clone();
+            *ACTIVE_DB.write() = Some(db_path.clone());
             let conn = db::open(&db_path)?;
 
 

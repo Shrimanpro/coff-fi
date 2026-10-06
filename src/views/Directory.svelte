@@ -1,4 +1,5 @@
 <script lang="ts">
+  import Cover from "../components/Cover.svelte";
   import Icon from "../components/Icon.svelte";
   import SongRow from "../components/SongRow.svelte";
   import TileC from "../components/Tile.svelte";
@@ -73,6 +74,7 @@
       {/each}
     </nav>
     <header>
+      <div class="art"><Cover covers={data.covers} size={640} radius={14} icon="folder" /></div>
       <div class="info">
         <span class="eyebrow">Folder</span>
         <h1>{data.name}</h1>

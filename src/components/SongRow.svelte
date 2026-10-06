@@ -1,6 +1,7 @@
 <script lang="ts">
   import { time } from "../lib/format";
   import type { Track } from "../lib/types";
+  import Cover from "./Cover.svelte";
 
   let {
     track,
@@ -18,7 +19,7 @@
 >
   <div class="lead">
     {#if showArt}
-      <div class="art"></div>
+      <div class="art"><Cover covers={track.cover} size={96} radius={6} /></div>
     {:else}
       <span class="num">{track.track_no ?? index + 1}</span>
     {/if}

@@ -22,7 +22,9 @@ lofty = "0.22"
 rusqlite = { version = "0.32", features = ["bundled"] }
 walkdir = "2"
 rayon = "1"
+image = { version = "0.25", default-features = false, features = ["jpeg", "png", "webp", "gif", "bmp"] }
 xxhash-rust = { version = "0.8", features = ["xxh3"] }
+urlencoding = "2"
 
 [profile.release]
 opt-level = 3
