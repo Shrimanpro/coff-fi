@@ -1,6 +1,6 @@
 import { listen } from "@tauri-apps/api/event";
 import { api } from "./ipc";
-import type { Settings, Tile, TileKind, Track } from "./types";
+import type { Settings, Status, Tile, TileKind, Track } from "./types";
 
 export const ui = $state({
   base: "home" as "home" | "directory",
@@ -11,7 +11,20 @@ export const ui = $state({
   libVersion: 0,
 });
 
+export const player = $state({
+  status: { track_id: null, playing: false, position: 0, duration: 0 } as Status,
+  track: null as Track | null,
+  at: performance.now(),
+});
+
 export const conf = $state({ s: null as Settings | null });
+
+/** Smoothly interpolated playback position (status arrives on changes and every few seconds). */
+export function position(): number {
+  const st = player.status;
+  if (!st.playing) return st.position;
+  return Math.min(st.duration, st.position + (performance.now() - player.at) / 1000);
+}
 
 export function toast(msg: string) {
   console.error(msg);
@@ -25,14 +38,29 @@ export function setTheme(t: "dark" | "light") {
   } catch {}
 }
 
+/** Loads the player, queue and sleep timer of whichever device the UI is showing. */
+async function syncPlayer() {
+  const st = await api.status();
+  player.status = st;
+  player.at = performance.now();
+}
+
 function on<T>(name: string, fn: (payload: T) => void) {
   return listen<T>(name, (e) => fn(e.payload));
 }
 export async function init() {
   setTheme(ui.theme);
   conf.s = await api.getSettings();
+  await syncPlayer();
 
   await Promise.all([
+    on<Status>("player://state", (p) => {
+      player.status = p;
+      player.at = performance.now();
+    }),
+    on<Track | null>("player://track", (p) => {
+      player.track = p;
+    }),
     on("library://changed", () => {
       ui.libVersion++;
     }),
@@ -100,3 +128,11 @@ export function clicks(node: HTMLElement, h: { single: () => void; double: () =>
   };
 }
 
+export function volume(): number {
+  return conf.s?.volume ?? 0.8;
+}
+
+export function setVolume(v: number) {
+  if (conf.s) conf.s.volume = v;
+  api.setVolume(v).catch(() => {});
+}

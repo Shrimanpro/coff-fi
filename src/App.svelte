@@ -1,9 +1,11 @@
 <script lang="ts">
   import { onMount } from "svelte";
   import EdgePanel from "./components/EdgePanel.svelte";
+  import MiniPlayer from "./components/MiniPlayer.svelte";
   import TopBar from "./components/TopBar.svelte";
   import TreeSidebar from "./components/TreeSidebar.svelte";
-  import { init, toast, ui } from "./lib/state.svelte";
+  import { api } from "./lib/ipc";
+  import { init, player, toast, ui } from "./lib/state.svelte";
   import CollectionView from "./views/CollectionView.svelte";
   import Directory from "./views/Directory.svelte";
   import Home from "./views/Home.svelte";
@@ -51,6 +53,18 @@
     armClose(side);
   };
 
+  // ---- keyboard ----
+  function onKey(e: KeyboardEvent) {
+    const tag = (e.target as HTMLElement)?.tagName;
+    if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
+    const mod = e.ctrlKey || e.metaKey;
+    if (e.code === "Space") {
+      e.preventDefault();
+      if (player.status.track_id != null || player.track) api.cmd("toggle");
+    } else if (mod && e.key === "ArrowRight") api.cmd("next");
+    else if (mod && e.key === "ArrowLeft") api.cmd("prev");
+  }
+
   // Start each page at the top.
   $effect(() => {
     ui.base;
@@ -60,7 +74,7 @@
   });
 </script>
 
-<svelte:window onmousemove={onMove} />
+<svelte:window onmousemove={onMove} onkeydown={onKey} />
 
 <TopBar />
 
@@ -83,6 +97,8 @@
 <EdgePanel side="right" width={330} open={sides.right} onenter={enter("right")} onleave={leave("right")}>
   <TreeSidebar />
 </EdgePanel>
+
+<MiniPlayer />
 
 
 <style>

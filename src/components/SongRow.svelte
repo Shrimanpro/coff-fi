@@ -1,5 +1,6 @@
 <script lang="ts">
   import { time } from "../lib/format";
+  import { player } from "../lib/state.svelte";
   import type { Track } from "../lib/types";
   import Cover from "./Cover.svelte";
   import Icon from "./Icon.svelte";
@@ -12,10 +13,12 @@
     onplay,
   }: { track: Track; index: number; showArt?: boolean; showAlbum?: boolean; onplay: () => void } = $props();
 
+  const current = $derived(player.status.track_id === track.id);
 </script>
 
 <div
   class="row"
+  class:current
   role="button"
   tabindex="-1"
   ondblclick={onplay}
@@ -27,7 +30,11 @@
     {:else}
       <span class="num">{track.track_no ?? index + 1}</span>
     {/if}
+    {#if current}
+      <span class="eq" class:paused={!player.status.playing}><i></i><i></i><i></i></span>
+    {:else}
       <button class="hover-play" aria-label="Play" onclick={onplay}><Icon name="play" size={14} /></button>
+    {/if}
   </div>
   <div class="main">
     <div class="title ellipsis">{track.title}</div>

@@ -1,6 +1,6 @@
 <script lang="ts">
   import { getCurrentWindow } from "@tauri-apps/api/window";
-  import { setTheme, ui } from "../lib/state.svelte";
+  import { player, setTheme, ui } from "../lib/state.svelte";
   import Icon from "./Icon.svelte";
   import Logo from "./Logo.svelte";
 
@@ -32,7 +32,7 @@
 <header class="top" class:mac onmousedown={drag} onwheel={wheel}>
   <div class="brand glass">
     <div class="logo-word">
-      <Logo size={26} />
+      <Logo size={26} live={player.status.playing} />
       <span class="word">Coff-fi</span>
     </div>
     <span class="sep"></span>
