@@ -182,6 +182,9 @@ impl Engine {
                 self.fill();
                 self.track_position();
             }
+            if let Some(o) = &mut self.out {
+                o.idle();
+            }
             self.publish(false);
         }
     }

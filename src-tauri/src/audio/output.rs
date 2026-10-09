@@ -14,6 +14,8 @@ pub struct Shared {
     pub played: AtomicU64,
     flush_req: AtomicU64,
     flush_ack: AtomicU64,
+    /// True once a pause fade has fully reached silence.
+    pub silent: AtomicBool,
 }
 
 pub struct Output {
@@ -21,6 +23,7 @@ pub struct Output {
     pub prod: Producer<f32>,
     pub shared: Arc<Shared>,
     pub rate: u32,
+    running: bool,
 }
 
 /// Perceptual volume curve.
@@ -45,6 +48,7 @@ impl Output {
             played: AtomicU64::new(0),
             flush_req: AtomicU64::new(0),
             flush_ack: AtomicU64::new(0),
+            silent: AtomicBool::new(true),
         });
         let sc: cpal::StreamConfig = cfg.clone().into();
         let stream = match cfg.sample_format() {
@@ -54,8 +58,8 @@ impl Output {
             cpal::SampleFormat::I32 => build::<i32>(&dev, &sc, channels, cons, shared.clone()),
             f => Err(anyhow!("unsupported sample format {f:?}")),
         }?;
-        stream.play()?;
-        Ok(Self { stream, prod, shared, rate })
+        stream.pause().ok();
+        Ok(Self { stream, prod, shared, rate, running: false })
     }
 
     pub fn set_volume(&self, v: f32) {
@@ -64,11 +68,28 @@ impl Output {
 
     pub fn set_playing(&mut self, on: bool) {
         self.shared.paused.store(!on, Relaxed);
+        if on {
+            self.shared.silent.store(false, Relaxed);
+            if !self.running {
+                self.running = self.stream.play().is_ok();
+            }
+        }
+    }
+
+    /// Stops the device callback once the pause fade has finished (saves CPU while paused).
+    pub fn idle(&mut self) {
+        if self.running && self.shared.paused.load(Relaxed) && self.shared.silent.load(Relaxed) {
+            self.running = self.stream.pause().is_err();
+        }
     }
 
     /// Discards everything queued. Writing must wait until `flushed()`.
     pub fn flush(&mut self) {
         self.shared.flush_req.fetch_add(1, AcqRel);
+        if !self.running {
+            // The callback is stopped, so briefly run it to acknowledge the flush.
+            self.running = self.stream.play().is_ok();
+        }
     }
 
     pub fn flushed(&self) -> bool {
@@ -106,6 +127,7 @@ fn build<T: SizedSample + FromSample<f32>>(
             }
             let paused = sh.paused.load(Relaxed);
             if paused && fade <= 0.0 {
+                sh.silent.store(true, Relaxed);
                 data.iter_mut().for_each(|s| *s = T::EQUILIBRIUM);
                 return;
             }
