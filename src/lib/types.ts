@@ -57,8 +57,20 @@ export interface Status {
   duration: number;
 }
 
+export type Repeat = "off" | "all" | "one";
+
+export interface QueueView {
+  name: string;
+  pos: number;
+  shuffle: boolean;
+  repeat: Repeat;
+  tracks: Track[];
+}
+
 export interface Settings {
   roots: string[];
   excluded: string[];
   volume: number;
+  shuffle: boolean;
+  repeat: Repeat;
 }

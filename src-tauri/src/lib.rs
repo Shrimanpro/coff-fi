@@ -8,14 +8,15 @@ use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, Ordering};
 
 use parking_lot::{Mutex, RwLock};
-use rusqlite::Connection;
+use rusqlite::{params, Connection};
+use serde::Serialize;
 use tauri::http::{Request, Response, StatusCode};
 use tauri::{AppHandle, Emitter, Manager, State};
 
 use audio::{Cmd, Event, Player, Status};
 use library::{covers, db, scan, Collection, FolderView, Home, Tile};
 use queue::Queue;
-use settings::Settings;
+use settings::{Repeat, Settings};
 
 type Res<T> = Result<T, String>;
 
@@ -54,9 +55,33 @@ fn set_settings(app: AppHandle, st: State<AppState>, settings: Settings) -> Res<
     if s.volume != old.volume {
         st.player.send(Cmd::Volume(s.volume));
     }
+    if s.shuffle != old.shuffle || s.repeat != old.repeat {
+        {
+            let mut q = st.player.queue.lock();
+            q.set_shuffle(s.shuffle);
+            q.repeat = s.repeat;
+        }
+        queue_changed(&app, &st);
+    }
     if s.roots != old.roots || s.excluded != old.excluded {
         rescan_now(&app);
     }
+    Ok(())
+}
+
+/// Shuffle / repeat without a full settings round-trip (also used by controlling devices, which
+/// must not overwrite this device's other settings).
+#[tauri::command]
+fn set_play_mode(app: AppHandle, st: State<AppState>, shuffle: Option<bool>, repeat: Option<Repeat>) -> Res<()> {
+    let mut s = st.settings.read().clone();
+    if let Some(v) = shuffle {
+        s.shuffle = v;
+    }
+    if let Some(v) = repeat {
+        s.repeat = v;
+    }
+    set_settings(app.clone(), app.state::<AppState>(), s)?;
+    let _ = app.emit("settings://changed", ());
     Ok(())
 }
 
@@ -70,6 +95,17 @@ fn set_volume(st: State<AppState>, volume: f32) -> Res<()> {
         s.clone()
     };
     save_settings(&st.cfg_db.lock(), &s)
+}
+
+fn load_current_queue(conn: &Connection, s: &Settings) -> Queue {
+    let mut q = Queue::default();
+    q.shuffle = s.shuffle;
+    q.repeat = s.repeat;
+    let current: Option<i64> = conn.query_row("SELECT id FROM queues WHERE kind = 'current'", [], |r| r.get(0)).ok();
+    if let Some((name, items, pos)) = current.and_then(|id| read_queue(conn, id).ok()) {
+        q.restore(name, items, pos);
+    }
+    q
 }
 
 // ---------- library ----------
@@ -139,6 +175,56 @@ async fn get_collection(st: State<'_, AppState>, kind: String, id: String) -> Re
 
 // ---------- queue & playback ----------
 
+#[derive(Serialize)]
+struct QueueView {
+    name: String,
+    pos: usize,
+    shuffle: bool,
+    repeat: Repeat,
+    tracks: Vec<db::Track>,
+}
+
+fn write_queue(conn: &Connection, id: Option<i64>, kind: &str, q: &Queue) -> rusqlite::Result<i64> {
+    let id = match id {
+        Some(id) => {
+            conn.execute("UPDATE queues SET name = ?2, pos = ?3, updated_at = ?4 WHERE id = ?1", params![id, q.name, q.pos as i64, db::now()])?;
+            conn.execute("DELETE FROM queue_items WHERE queue_id = ?1", [id])?;
+            id
+        }
+        None => {
+            conn.execute("INSERT INTO queues(name, kind, pos, updated_at) VALUES(?1, ?2, ?3, ?4)", params![q.name, kind, q.pos as i64, db::now()])?;
+            conn.last_insert_rowid()
+        }
+    };
+    let mut ins = conn.prepare_cached("INSERT INTO queue_items(queue_id, idx, track_id) VALUES(?1, ?2, ?3)")?;
+    for (i, t) in q.items.iter().enumerate() {
+        ins.execute(params![id, i as i64, t])?;
+    }
+    Ok(id)
+}
+
+fn persist_current(conn: &mut Connection, q: &Queue) -> rusqlite::Result<()> {
+    let tx = conn.transaction()?;
+    let existing: Option<i64> = tx.query_row("SELECT id FROM queues WHERE kind = 'current'", [], |r| r.get(0)).ok();
+    write_queue(&tx, existing, "current", q)?;
+    tx.commit()
+}
+
+fn read_queue(conn: &Connection, id: i64) -> rusqlite::Result<(String, Vec<i64>, usize)> {
+    let (name, pos): (String, i64) = conn.query_row("SELECT name, pos FROM queues WHERE id = ?1", [id], |r| Ok((r.get(0)?, r.get(1)?)))?;
+    let mut st = conn.prepare_cached("SELECT track_id FROM queue_items WHERE queue_id = ?1 ORDER BY idx")?;
+    let items = st.query_map([id], |r| r.get(0))?.collect::<rusqlite::Result<Vec<i64>>>()?;
+    Ok((name, items, pos.max(0) as usize))
+}
+
+fn queue_changed(app: &AppHandle, st: &AppState) {
+    let q = st.player.queue.lock().clone();
+    if let Err(e) = persist_current(&mut st.db.lock(), &q) {
+        eprintln!("persist queue: {e}");
+    }
+    let _ = app.emit("queue://changed", ());
+}
+
 #[tauri::command]
 fn play_tracks(app: AppHandle, st: State<AppState>, ids: Vec<i64>, start: usize, name: String) -> Res<()> {
     if ids.is_empty() {
@@ -150,8 +236,29 @@ fn play_tracks(app: AppHandle, st: State<AppState>, ids: Vec<i64>, start: usize,
         // With shuffle on, `set` moves the chosen track to the front.
         q.current()
     };
+    queue_changed(&app, &st);
     if let Some(id) = id {
         st.player.send(Cmd::Load { id, start: 0.0, play: true });
+    }
+    Ok(())
+}
+
+#[tauri::command]
+fn enqueue(app: AppHandle, st: State<AppState>, ids: Vec<i64>, next: bool) -> Res<()> {
+    let was_empty = {
+        let mut q = st.player.queue.lock();
+        let empty = q.is_empty();
+        if empty {
+            q.name = "Queue".into();
+        }
+        q.add(&ids, next);
+        empty
+    };
+    queue_changed(&app, &st);
+    if was_empty && st.player.status.read().track_id.is_none() {
+        if let Some(id) = st.player.queue.lock().current() {
+            st.player.send(Cmd::Load { id, start: 0.0, play: true });
+        }
     }
     Ok(())
 }
@@ -175,6 +282,44 @@ fn player_cmd(st: State<AppState>, cmd: String, value: Option<f64>) -> Res<()> {
 #[tauri::command]
 fn get_status(st: State<AppState>) -> Status {
     st.player.status.read().clone()
+}
+
+#[tauri::command]
+async fn get_queue(st: State<'_, AppState>) -> Res<QueueView> {
+    let q = st.player.queue.lock().clone();
+    let tracks = db::tracks_by_ids(&st.db.lock(), &q.items).map_err(err)?;
+    Ok(QueueView { name: q.name, pos: q.pos, shuffle: q.shuffle, repeat: q.repeat, tracks })
+}
+
+#[tauri::command]
+fn queue_edit(app: AppHandle, st: State<AppState>, op: String, a: usize, b: Option<usize>) -> Res<()> {
+    let jump = {
+        let mut q = st.player.queue.lock();
+        let before = q.current();
+        match op.as_str() {
+            "jump" => {
+                q.jump(a);
+                q.current()
+            }
+            "remove" => {
+                let removing_current = a == q.pos;
+                q.remove(a);
+                if removing_current { q.current().filter(|_| before.is_some()) } else { None }
+            }
+            "move" => {
+                q.move_item(a, b.unwrap_or(a));
+                None
+            }
+            _ => return Err(format!("unknown op {op}")),
+        }
+    };
+    queue_changed(&app, &st);
+    match (op.as_str(), jump) {
+        (_, Some(id)) => st.player.send(Cmd::Load { id, start: 0.0, play: true }),
+        ("remove", None) if st.player.queue.lock().is_empty() => st.player.send(Cmd::Stop),
+        _ => {}
+    }
+    Ok(())
 }
 
 // ---------- cover protocol ----------
@@ -243,6 +388,8 @@ fn on_player_event(app: &AppHandle, e: Event) {
             let track = id.and_then(|id| db::track(&st.db.lock(), id).ok().flatten());
             let _ = app.emit("player://track", &track);
             let _ = app.emit("queue://changed", ());
+            let q = st.player.queue.lock().clone();
+            let _ = persist_current(&mut st.db.lock(), &q);
         }
         Event::Error(msg) => {
             let _ = app.emit("app://error", msg);
@@ -280,7 +427,7 @@ pub fn run() {
             let db_path = local_path.clone();
             *ACTIVE_DB.write() = Some(db_path.clone());
             let conn = db::open(&db_path)?;
-            let q = Queue::default();
+            let q = load_current_queue(&conn, &s);
 
             let h = app.handle().clone();
             let player = Player::spawn(db_path.clone(), &s, q, move |e| on_player_event(&h, e));
@@ -308,8 +455,12 @@ pub fn run() {
             get_folder,
             get_collection,
             play_tracks,
+            enqueue,
             player_cmd,
             get_status,
+            get_queue,
+            queue_edit,
+            set_play_mode,
         ])
         .run(tauri::generate_context!())
         .expect("error while running Coff-fi");

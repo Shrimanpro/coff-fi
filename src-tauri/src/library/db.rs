@@ -35,6 +35,9 @@ CREATE INDEX IF NOT EXISTS tracks_album ON tracks(album, album_artist);
 CREATE INDEX IF NOT EXISTS tracks_artist ON tracks(artist);
 CREATE TABLE IF NOT EXISTS covers(hash TEXT PRIMARY KEY, path TEXT NOT NULL, embedded INTEGER NOT NULL);
 CREATE TABLE IF NOT EXISTS folder_covers(dir TEXT PRIMARY KEY, hash TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS queues(id INTEGER PRIMARY KEY, name TEXT NOT NULL, kind TEXT NOT NULL, pos INTEGER NOT NULL, updated_at INTEGER NOT NULL);
+CREATE TABLE IF NOT EXISTS queue_items(queue_id INTEGER NOT NULL, idx INTEGER NOT NULL, track_id INTEGER NOT NULL);
+CREATE INDEX IF NOT EXISTS queue_items_q ON queue_items(queue_id);
 CREATE TABLE IF NOT EXISTS settings(k TEXT PRIMARY KEY, v TEXT NOT NULL);
 ";
 
@@ -101,6 +104,17 @@ pub fn tracks_where(conn: &Connection, clause: &str, p: impl rusqlite::Params) -
 
 pub fn track(conn: &Connection, id: i64) -> Result<Option<Track>> {
     Ok(tracks_where(conn, "WHERE t.id = ?1", [id])?.into_iter().next())
+}
+
+/// Fetch tracks preserving the order of `ids` (duplicates allowed, missing ids dropped).
+pub fn tracks_by_ids(conn: &Connection, ids: &[i64]) -> Result<Vec<Track>> {
+    if ids.is_empty() {
+        return Ok(Vec::new());
+    }
+    let list = ids.iter().map(i64::to_string).collect::<Vec<_>>().join(",");
+    let found = tracks_where(conn, &format!("WHERE t.id IN ({list})"), [])?;
+    let map: std::collections::HashMap<i64, Track> = found.into_iter().map(|t| (t.id, t)).collect();
+    Ok(ids.iter().filter_map(|id| map.get(id).cloned()).collect())
 }
 
 pub fn get_setting(conn: &Connection, k: &str) -> Result<Option<String>> {

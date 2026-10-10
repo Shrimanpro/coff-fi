@@ -4,7 +4,7 @@
   import SongRow from "../components/SongRow.svelte";
   import VirtualList from "../components/VirtualList.svelte";
   import { api } from "../lib/ipc";
-  import { playTracks, toast, ui } from "../lib/state.svelte";
+  import { enqueueTracks, playTracks, shufflePlay, toast, ui } from "../lib/state.svelte";
   import type { Collection } from "../lib/types";
 
   let { kind, id, scroller }: { kind: string; id: string; scroller: HTMLElement | null } = $props();
@@ -31,6 +31,8 @@
         <p class="sub">{data.subtitle} · {Math.round(total / 60)} min</p>
         <div class="actions">
           <button class="pill-btn" disabled={!data.tracks.length} onclick={() => data && playTracks(data.tracks, 0, data.title)}><Icon name="play" size={16} /> Play</button>
+          <button class="pill-btn ghost" onclick={() => data && shufflePlay(data.tracks, data.title)}><Icon name="shuffle" size={16} /> Shuffle</button>
+          <button class="icon-btn" title="Add to queue" onclick={() => data && enqueueTracks(data.tracks, false)}><Icon name="plus" /></button>
         </div>
       </div>
     </header>

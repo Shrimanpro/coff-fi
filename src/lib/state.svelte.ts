@@ -1,11 +1,12 @@
 import { listen } from "@tauri-apps/api/event";
 import { api } from "./ipc";
-import type { Settings, Status, Tile, TileKind, Track } from "./types";
+import type { QueueView, Settings, Status, Tile, TileKind, Track } from "./types";
 
 export const ui = $state({
   base: "home" as "home" | "directory",
   dirPath: null as string | null,
   collection: null as { kind: TileKind; id: string } | null,
+  leftPinned: false,
   theme: (document.documentElement.dataset.theme as "dark" | "light") || (matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark"),
   scanning: false,
   libVersion: 0,
@@ -16,6 +17,8 @@ export const player = $state({
   track: null as Track | null,
   at: performance.now(),
 });
+
+export const queue = $state<QueueView>({ name: "", pos: 0, shuffle: false, repeat: "off", tracks: [] });
 
 export const conf = $state({ s: null as Settings | null });
 
@@ -38,11 +41,16 @@ export function setTheme(t: "dark" | "light") {
   } catch {}
 }
 
+async function refreshQueue() {
+  Object.assign(queue, await api.queue());
+}
+
 /** Loads the player, queue and sleep timer of whichever device the UI is showing. */
 async function syncPlayer() {
-  const st = await api.status();
+  const [st] = await Promise.all([api.status(), refreshQueue()]);
   player.status = st;
   player.at = performance.now();
+  player.track = st.track_id != null ? (queue.tracks.find((t) => t.id === st.track_id) ?? null) : null;
 }
 
 function on<T>(name: string, fn: (payload: T) => void) {
@@ -61,8 +69,12 @@ export async function init() {
     on<Track | null>("player://track", (p) => {
       player.track = p;
     }),
+    on("queue://changed", () => {
+      refreshQueue();
+    }),
     on("library://changed", () => {
       ui.libVersion++;
+      refreshQueue();
     }),
     listen<boolean>("library://scanning", (e) => (ui.scanning = e.payload)),
     listen<string>("app://error", (e) => toast(e.payload)),
@@ -86,6 +98,21 @@ export async function tileTracks(t: Tile): Promise<Track[]> {
 
 export async function playTile(t: Tile) {
   playTracks(await tileTracks(t), 0, t.name);
+}
+
+export async function enqueueTile(t: Tile, next: boolean) {
+  const ids = (await tileTracks(t)).map((x) => x.id);
+  if (ids.length) await api.enqueue(ids, next);
+  toast(next ? `“${t.name}” will play next` : `Added “${t.name}” to the queue`);
+}
+
+export function enqueueTracks(tracks: Track[], next: boolean) {
+  api.enqueue(
+    tracks.map((t) => t.id),
+    next,
+  );
+  const what = tracks.length === 1 ? `“${tracks[0].title}”` : `${tracks.length} songs`;
+  toast(next ? `${what} will play next` : `Added ${what} to the queue`);
 }
 
 export function openTile(t: Tile) {
@@ -126,6 +153,30 @@ export function clicks(node: HTMLElement, h: { single: () => void; double: () =>
       node.removeEventListener("click", onClick);
     },
   };
+}
+
+export async function shufflePlay(tracks: Track[], name: string) {
+  if (!tracks.length) return;
+  if (!queue.shuffle) {
+    queue.shuffle = true;
+    await api.setPlayMode({ shuffle: true });
+  }
+  playTracks(tracks, Math.floor(Math.random() * tracks.length), name);
+}
+
+// Shuffle / repeat / volume act on the device that's playing (this one or a controlled one).
+
+export function toggleShuffle() {
+  queue.shuffle = !queue.shuffle;
+  if (conf.s) conf.s.shuffle = queue.shuffle;
+  api.setPlayMode({ shuffle: queue.shuffle }).catch((e) => toast(String(e)));
+}
+
+export function cycleRepeat() {
+  const order = ["off", "all", "one"] as const;
+  queue.repeat = order[(order.indexOf(queue.repeat) + 1) % 3];
+  if (conf.s) conf.s.repeat = queue.repeat;
+  api.setPlayMode({ repeat: queue.repeat }).catch((e) => toast(String(e)));
 }
 
 export function volume(): number {

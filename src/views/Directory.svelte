@@ -5,7 +5,7 @@
   import TileC from "../components/Tile.svelte";
   import VirtualList from "../components/VirtualList.svelte";
   import { api } from "../lib/ipc";
-  import { conf, playTracks, toast, ui } from "../lib/state.svelte";
+  import { conf, playTracks, shufflePlay, toast, ui } from "../lib/state.svelte";
   import type { FolderView, Tile } from "../lib/types";
 
   let { scroller }: { scroller: HTMLElement | null } = $props();
@@ -84,6 +84,7 @@
         <p class="sub">{summary}</p>
         <div class="actions">
           <button class="pill-btn" onclick={async () => playTracks(await all(), 0, data!.name)}><Icon name="play" size={16} /> Play</button>
+          <button class="pill-btn ghost" onclick={async () => shufflePlay(await all(), data!.name)}><Icon name="shuffle" size={16} /> Shuffle</button>
         </div>
       </div>
     </header>

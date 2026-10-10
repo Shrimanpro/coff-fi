@@ -2,6 +2,7 @@
   import { onMount } from "svelte";
   import EdgePanel from "./components/EdgePanel.svelte";
   import MiniPlayer from "./components/MiniPlayer.svelte";
+  import QueueSidebar from "./components/QueueSidebar.svelte";
   import TopBar from "./components/TopBar.svelte";
   import TreeSidebar from "./components/TreeSidebar.svelte";
   import { api } from "./lib/ipc";
@@ -94,6 +95,9 @@
   </div>
 </main>
 
+<EdgePanel side="left" width={300} open={sides.left || ui.leftPinned} onenter={enter("left")} onleave={leave("left")}>
+  <QueueSidebar />
+</EdgePanel>
 <EdgePanel side="right" width={330} open={sides.right} onenter={enter("right")} onleave={leave("right")}>
   <TreeSidebar />
 </EdgePanel>
