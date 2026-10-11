@@ -1,7 +1,7 @@
 <script lang="ts">
   import { time } from "../lib/format";
   import { api } from "../lib/ipc";
-  import { player, queue, ui } from "../lib/state.svelte";
+  import { player, queue, trackMenu, ui } from "../lib/state.svelte";
   import type { Track } from "../lib/types";
   import Cover from "./Cover.svelte";
   import Icon from "./Icon.svelte";
@@ -66,6 +66,7 @@
           }}
           ondragend={() => (dragFrom = dragOver = null)}
           ondblclick={() => api.queueEdit("jump", i)}
+          oncontextmenu={(e) => trackMenu(e, t)}
         >
           <div class="art"><Cover covers={t.cover} size={96} radius={6} /></div>
           <div class="meta">

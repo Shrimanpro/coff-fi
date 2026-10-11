@@ -401,6 +401,7 @@ fn on_player_event(app: &AppHandle, e: Event) {
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_opener::init())
         .register_asynchronous_uri_scheme_protocol("coffi", |_ctx, req, responder| {
             rayon::spawn(move || responder.respond(cover_response(&req)));
         })

@@ -2,6 +2,11 @@ import { listen } from "@tauri-apps/api/event";
 import { api } from "./ipc";
 import type { QueueView, Settings, Status, Tile, TileKind, Track } from "./types";
 
+export interface MenuItem {
+  label: string;
+  action: () => void;
+}
+
 export const ui = $state({
   base: "home" as "home" | "directory",
   dirPath: null as string | null,
@@ -10,6 +15,8 @@ export const ui = $state({
   theme: (document.documentElement.dataset.theme as "dark" | "light") || (matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark"),
   scanning: false,
   libVersion: 0,
+  toast: null as string | null,
+  menu: null as { x: number; y: number; items: MenuItem[] } | null,
 });
 
 export const player = $state({
@@ -29,8 +36,11 @@ export function position(): number {
   return Math.min(st.duration, st.position + (performance.now() - player.at) / 1000);
 }
 
+let toastTimer: ReturnType<typeof setTimeout> | undefined;
 export function toast(msg: string) {
-  console.error(msg);
+  ui.toast = msg;
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => (ui.toast = null), 4200);
 }
 
 export function setTheme(t: "dark" | "light") {
@@ -39,6 +49,12 @@ export function setTheme(t: "dark" | "light") {
   try {
     localStorage.setItem("theme", t);
   } catch {}
+}
+
+export function openMenu(e: MouseEvent, items: MenuItem[]) {
+  e.preventDefault();
+  e.stopPropagation();
+  ui.menu = { x: e.clientX, y: e.clientY, items };
 }
 
 async function refreshQueue() {
@@ -123,6 +139,31 @@ export function openTile(t: Tile) {
   } else {
     ui.collection = { kind: t.kind, id: t.id };
   }
+}
+
+export function tileMenu(e: MouseEvent, t: Tile) {
+  openMenu(e, [
+    { label: "Play", action: () => playTile(t) },
+    { label: "Play next", action: () => enqueueTile(t, true) },
+    { label: "Add to queue", action: () => enqueueTile(t, false) },
+  ]);
+}
+
+export function trackMenu(e: MouseEvent, t: Track) {
+  openMenu(e, [
+    { label: "Play next", action: () => enqueueTracks([t], true) },
+    { label: "Add to queue", action: () => enqueueTracks([t], false) },
+    { label: "Go to album", action: () => (ui.collection = { kind: "album", id: `${t.album_artist}\u001f${t.album}` }) },
+    { label: "Go to artist", action: () => (ui.collection = { kind: "artist", id: t.artist }) },
+    {
+      label: "Open folder",
+      action: () => {
+        ui.collection = null;
+        ui.base = "directory";
+        ui.dirPath = t.dir;
+      },
+    },
+  ]);
 }
 
 /**

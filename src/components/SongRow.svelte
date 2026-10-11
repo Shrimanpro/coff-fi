@@ -1,6 +1,6 @@
 <script lang="ts">
   import { time } from "../lib/format";
-  import { player } from "../lib/state.svelte";
+  import { player, trackMenu } from "../lib/state.svelte";
   import type { Track } from "../lib/types";
   import Cover from "./Cover.svelte";
   import Icon from "./Icon.svelte";
@@ -22,6 +22,7 @@
   role="button"
   tabindex="-1"
   ondblclick={onplay}
+  oncontextmenu={(e) => trackMenu(e, track)}
   onkeydown={(e) => e.key === "Enter" && onplay()}
 >
   <div class="lead">

@@ -1,7 +1,8 @@
 <script lang="ts">
+  import { revealItemInDir } from "@tauri-apps/plugin-opener";
   import { quality } from "../lib/format";
   import { blurSrc } from "../lib/ipc";
-  import { player, setVolume, ui, volume } from "../lib/state.svelte";
+  import { enqueueTracks, openMenu, player, setVolume, toast, ui, volume } from "../lib/state.svelte";
   import Cover from "./Cover.svelte";
   import Icon from "./Icon.svelte";
   import Scrubber from "./Scrubber.svelte";
@@ -10,6 +11,18 @@
   const t = $derived(player.track);
   const show = $derived(!!t && player.status.track_id != null);
   let volOpen = $state(false);
+
+  function more(e: MouseEvent) {
+    if (!t) return;
+    const tr = t;
+    openMenu(e, [
+      { label: "Go to album", action: () => (ui.collection = { kind: "album", id: `${tr.album_artist}\u001f${tr.album}` }) },
+      { label: "Go to artist", action: () => (ui.collection = { kind: "artist", id: tr.artist }) },
+      { label: "Open folder", action: () => ((ui.collection = null), (ui.base = "directory"), (ui.dirPath = tr.dir)) },
+      { label: "Play again next", action: () => enqueueTracks([tr], true) },
+      { label: "Show file", action: () => revealItemInDir(tr.path).catch((x) => toast(String(x))) },
+    ]);
+  }
 
   const setVol = setVolume;
   const vol = $derived(volume());
@@ -34,6 +47,7 @@
       <div class="title ellipsis">{t?.title ?? ""}</div>
       <div class="artist ellipsis">{t?.artist ?? ""}{t?.album ? ` — ${t.album}` : ""}</div>
     </div>
+    <button class="icon-btn" title="More" onclick={more}><Icon name="more" /></button>
 
     <div class="center"><Transport /></div>
 

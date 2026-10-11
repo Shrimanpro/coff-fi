@@ -2,7 +2,7 @@
   import { SvelteMap, SvelteSet } from "svelte/reactivity";
   import { time } from "../lib/format";
   import { api } from "../lib/ipc";
-  import { clicks, playTile, playTracks, ui } from "../lib/state.svelte";
+  import { clicks, playTile, playTracks, tileMenu, trackMenu, ui } from "../lib/state.svelte";
   import type { FolderView, Tile, Track } from "../lib/types";
   import Icon from "./Icon.svelte";
   import VirtualList from "./VirtualList.svelte";
@@ -90,6 +90,7 @@
           aria-expanded={r.expanded}
           tabindex="-1"
           use:clicks={{ single: () => open(r.tile), double: () => playTile(r.tile) }}
+          oncontextmenu={(e) => tileMenu(e, r.tile)}
         >
           <span class="chev" class:down={r.expanded}><Icon name="chev-right" size={13} /></span>
           <Icon name="folder" size={15} />
@@ -104,6 +105,7 @@
           aria-selected="false"
           tabindex="-1"
           ondblclick={() => playTracks(r.list, r.idx, r.folder)}
+          oncontextmenu={(e) => trackMenu(e, r.track)}
         >
           <Icon name="music" size={13} />
           <span class="name ellipsis">{r.track.title}</span>

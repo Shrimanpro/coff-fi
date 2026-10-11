@@ -1,8 +1,10 @@
 <script lang="ts">
   import { onMount } from "svelte";
+  import ContextMenu from "./components/ContextMenu.svelte";
   import EdgePanel from "./components/EdgePanel.svelte";
   import MiniPlayer from "./components/MiniPlayer.svelte";
   import QueueSidebar from "./components/QueueSidebar.svelte";
+  import Toast from "./components/Toast.svelte";
   import TopBar from "./components/TopBar.svelte";
   import TreeSidebar from "./components/TreeSidebar.svelte";
   import { api } from "./lib/ipc";
@@ -29,7 +31,8 @@
   function armClose(side: "left" | "right", delay = 420) {
     clearTimeout(timers[side]);
     timers[side] = setTimeout(() => {
-      if (!over[side]) sides[side] = false;
+      if (!over[side] && !ui.menu) sides[side] = false;
+      else if (ui.menu) armClose(side);
     }, delay);
   }
 
@@ -104,6 +107,8 @@
 
 <MiniPlayer />
 
+<ContextMenu />
+<Toast />
 
 <style>
   main {

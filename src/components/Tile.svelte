@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { clicks, openTile, playTile } from "../lib/state.svelte";
+  import { clicks, openTile, playTile, tileMenu } from "../lib/state.svelte";
   import type { Tile } from "../lib/types";
   import Cover from "./Cover.svelte";
   import Icon from "./Icon.svelte";
@@ -15,6 +15,7 @@
   role="button"
   tabindex="0"
   use:clicks={{ single: () => openTile(tile), double: () => playTile(tile) }}
+  oncontextmenu={(e) => tileMenu(e, tile)}
   onkeydown={(e) => e.key === "Enter" && openTile(tile)}
 >
   <div class="art">
