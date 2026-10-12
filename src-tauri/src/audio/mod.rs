@@ -9,6 +9,7 @@ use std::time::{Duration, Instant};
 use anyhow::{anyhow, Result};
 use crossbeam_channel::{unbounded, Receiver, RecvTimeoutError, Sender};
 use parking_lot::{Mutex, RwLock};
+use rubato::{Resampler as _, SincFixedIn, SincInterpolationParameters, SincInterpolationType, WindowFunction};
 use serde::Serialize;
 
 use crate::library::db;
@@ -75,10 +76,61 @@ struct Init {
     volume: f32,
 }
 
+/// Sinc resampler fed with interleaved stereo.
+struct Rs {
+    r: SincFixedIn<f32>,
+    inp: [Vec<f32>; 2],
+}
+
+impl Rs {
+    fn new(ratio: f64) -> Result<Self> {
+        let p = SincInterpolationParameters {
+            sinc_len: 128,
+            f_cutoff: 0.95,
+            interpolation: SincInterpolationType::Linear,
+            oversampling_factor: 128,
+            window: WindowFunction::BlackmanHarris2,
+        };
+        Ok(Self { r: SincFixedIn::new(ratio, 1.0, p, 1024, 2)?, inp: [Vec::new(), Vec::new()] })
+    }
+
+    fn push(&mut self, data: &[f32], out: &mut Vec<f32>, last: bool) -> Result<()> {
+        for f in data.chunks_exact(2) {
+            self.inp[0].push(f[0]);
+            self.inp[1].push(f[1]);
+        }
+        loop {
+            let need = self.r.input_frames_next();
+            if self.inp[0].len() < need {
+                break;
+            }
+            let res = self.r.process(&[&self.inp[0][..need], &self.inp[1][..need]], None)?;
+            interleave(&res, out);
+            self.inp.iter_mut().for_each(|c| {
+                c.drain(..need);
+            });
+        }
+        if last && !self.inp[0].is_empty() {
+            let res = self.r.process_partial(Some(&[&self.inp[0][..], &self.inp[1][..]]), None)?;
+            interleave(&res, out);
+            self.inp.iter_mut().for_each(Vec::clear);
+        }
+        Ok(())
+    }
+}
+
+fn interleave(ch: &[Vec<f32>], out: &mut Vec<f32>) {
+    out.reserve(ch[0].len() * 2);
+    for (l, r) in ch[0].iter().zip(&ch[1]) {
+        out.extend_from_slice(&[*l, *r]);
+    }
+}
+
 /// One track being decoded into the output's sample rate.
 struct Src {
     id: i64,
     dec: Decoder,
+    rs: Option<Rs>,
     pending: Vec<f32>,
     scratch: Vec<f32>,
     eof: bool,
@@ -90,8 +142,10 @@ impl Src {
     fn open(path: &Path, id: i64, start: f64, duration: f64, rate: u32) -> Result<(Self, f64)> {
         let mut dec = Decoder::open(path)?;
         let actual = if start > 0.05 { dec.seek(start).unwrap_or(0.0) } else { 0.0 };
+        let ratio = rate as f64 / dec.sample_rate as f64;
+        let rs = if (ratio - 1.0).abs() < 1e-9 { None } else { Some(Rs::new(ratio)?) };
         let total_frames = ((duration - actual).max(0.0) * rate as f64) as u64;
-        Ok((Self { id, dec, pending: Vec::new(), scratch: Vec::new(), eof: false, out_frames: 0, total_frames }, actual))
+        Ok((Self { id, dec, rs, pending: Vec::new(), scratch: Vec::new(), eof: false, out_frames: 0, total_frames }, actual))
     }
 
     fn remaining(&self) -> u64 {
@@ -107,7 +161,14 @@ impl Src {
         while self.pending.len() < n * 2 && !self.eof {
             self.scratch.clear();
             let more = self.dec.next_chunk(&mut self.scratch).unwrap_or(false);
-            self.pending.extend_from_slice(&self.scratch);
+            match &mut self.rs {
+                Some(rs) => {
+                    if rs.push(&self.scratch, &mut self.pending, !more).is_err() {
+                        self.eof = true;
+                    }
+                }
+                None => self.pending.extend_from_slice(&self.scratch),
+            }
             self.eof |= !more;
         }
         let k = (n * 2).min(self.pending.len());

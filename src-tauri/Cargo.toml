@@ -23,6 +23,7 @@ crossbeam-channel = "0.5"
 symphonia = { version = "0.5", features = ["all"] }
 cpal = "0.15"
 rtrb = "0.3"
+rubato = "0.16"
 lofty = "0.22"
 rusqlite = { version = "0.32", features = ["bundled"] }
 walkdir = "2"
