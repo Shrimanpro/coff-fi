@@ -74,3 +74,11 @@ export interface Settings {
   shuffle: boolean;
   repeat: Repeat;
 }
+
+export interface SearchResults {
+  songs: Track[];
+  albums: Tile[];
+  artists: Tile[];
+  playlists: Tile[];
+}
+

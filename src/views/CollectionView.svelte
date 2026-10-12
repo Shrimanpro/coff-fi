@@ -15,6 +15,21 @@
     api.collection(kind, id).then((c) => (data = c)).catch((e) => toast(String(e)));
   });
 
+  // "Go to track": scroll the requested song into the middle of the view and highlight it.
+  let listEl = $state<HTMLDivElement>();
+  let flashId = $state<number | null>(null);
+  $effect(() => {
+    const want = ui.focusTrack;
+    if (want == null || !data || !listEl || !scroller) return;
+    const i = data.tracks.findIndex((t) => t.id === want);
+    ui.focusTrack = null;
+    if (i < 0) return;
+    const top = listEl.getBoundingClientRect().top - scroller.getBoundingClientRect().top + scroller.scrollTop + i * 56;
+    scroller.scrollTo({ top: Math.max(0, top - scroller.clientHeight / 2 + 28), behavior: "smooth" });
+    flashId = want;
+    setTimeout(() => (flashId = null), 2400);
+  });
+
   const total = $derived(data ? data.tracks.reduce((s, t) => s + t.duration, 0) : 0);
   const isAlbum = $derived(kind === "album");
   const label = $derived({ playlist: "Playlist", album: "Album", artist: "Artist", folder: "Folder" }[kind] ?? "");
@@ -37,9 +52,10 @@
       </div>
     </header>
     {#if data.tracks.length}
+      <div bind:this={listEl}></div>
       <VirtualList items={data.tracks} rowHeight={56} {scroller}>
         {#snippet row(t, i)}
-          <SongRow track={t} index={i} showArt={!isAlbum} showAlbum={!isAlbum} onplay={() => data && playTracks(data.tracks, i, data.title)} />
+          <SongRow track={t} index={i} showArt={!isAlbum} showAlbum={!isAlbum} flash={t.id === flashId} onplay={() => data && playTracks(data.tracks, i, data.title)} />
         {/snippet}
       </VirtualList>
     {:else}

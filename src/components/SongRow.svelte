@@ -11,7 +11,8 @@
     showArt = true,
     showAlbum = true,
     onplay,
-  }: { track: Track; index: number; showArt?: boolean; showAlbum?: boolean; onplay: () => void } = $props();
+    flash = false,
+  }: { track: Track; index: number; showArt?: boolean; showAlbum?: boolean; onplay: () => void; flash?: boolean } = $props();
 
   const current = $derived(player.status.track_id === track.id);
 </script>
@@ -19,6 +20,7 @@
 <div
   class="row"
   class:current
+  class:flash
   role="button"
   tabindex="-1"
   ondblclick={onplay}

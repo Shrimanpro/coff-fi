@@ -101,6 +101,63 @@ pub fn home(conn: &Connection) -> Result<Home> {
     Ok(Home { albums, artists, songs })
 }
 
+#[derive(Serialize)]
+pub struct SearchResults {
+    pub songs: Vec<Track>,
+    pub albums: Vec<Tile>,
+    pub artists: Vec<Tile>,
+    pub playlists: Vec<Tile>,
+}
+
+fn like_escape(s: &str) -> String {
+    s.replace('\\', "\\\\").replace('%', "\\%").replace('_', "\\_")
+}
+
+/// Finds songs, albums, artists and playlists. Every word of the query must match; results
+/// whose name starts with the query rank first.
+pub fn search(conn: &Connection, query: &str) -> Result<SearchResults> {
+    let words: Vec<String> = query.split_whitespace().map(|w| format!("%{}%", like_escape(w))).collect();
+    if words.is_empty() {
+        return Ok(SearchResults { songs: Vec::new(), albums: Vec::new(), artists: Vec::new(), playlists: Vec::new() });
+    }
+    let prefix = format!("{}%", like_escape(query.trim()));
+    let all = |cols: &str| (0..words.len()).map(|i| format!("({cols}) LIKE ?{} ESCAPE '\\'", i + 2)).collect::<Vec<_>>().join(" AND ");
+    let mut p: Vec<&dyn rusqlite::ToSql> = vec![&prefix];
+    p.extend(words.iter().map(|w| w as &dyn rusqlite::ToSql));
+
+    let songs = tracks_where(
+        conn,
+        &format!(
+            "WHERE {} ORDER BY (t.title LIKE ?1 ESCAPE '\\') DESC, t.title COLLATE NOCASE LIMIT 40",
+            all("t.title || ' ' || t.artist || ' ' || t.album")
+        ),
+        p.as_slice(),
+    )?;
+    let albums = group_tiles_p(
+        conn,
+        "album",
+        &format!(
+            "SELECT album, album_artist, COUNT(*), MAX(cover) FROM tracks WHERE album != '' AND {} GROUP BY album, album_artist
+             ORDER BY (album LIKE ?1 ESCAPE '\\') DESC, album COLLATE NOCASE LIMIT 16",
+            all("album || ' ' || album_artist")
+        ),
+        p.as_slice(),
+    )?;
+    let artists = group_tiles_p(
+        conn,
+        "artist",
+        &format!(
+            "SELECT artist, '', COUNT(*), MAX(cover) FROM tracks WHERE {} GROUP BY artist
+             ORDER BY (artist LIKE ?1 ESCAPE '\\') DESC, artist COLLATE NOCASE LIMIT 12",
+            all("artist")
+        ),
+        p.as_slice(),
+    )?;
+
+    let mut playlists = Vec::new();
+    Ok(SearchResults { songs, albums, artists, playlists })
+}
+
 /// Immediate sub-folders (that contain music somewhere below) and the loose tracks of `path`.
 pub fn folder_view(conn: &Connection, path: &str) -> Result<FolderView> {
     let path = norm_dir(path);

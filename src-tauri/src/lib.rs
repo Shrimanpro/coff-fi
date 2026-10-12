@@ -14,7 +14,7 @@ use tauri::http::{Request, Response, StatusCode};
 use tauri::{AppHandle, Emitter, Manager, State};
 
 use audio::{Cmd, Event, Player, Status};
-use library::{covers, db, scan, Collection, FolderView, Home, Tile};
+use library::{covers, db, scan, Collection, FolderView, Home, SearchResults, Tile};
 use queue::Queue;
 use settings::{Repeat, Settings};
 
@@ -171,6 +171,11 @@ async fn get_folder(st: State<'_, AppState>, path: String) -> Res<FolderView> {
 #[tauri::command]
 async fn get_collection(st: State<'_, AppState>, kind: String, id: String) -> Res<Collection> {
     library::collection(&st.db.lock(), &kind, &id).map_err(err)
+}
+
+#[tauri::command]
+async fn search(st: State<'_, AppState>, query: String) -> Res<SearchResults> {
+    library::search(&st.db.lock(), &query).map_err(err)
 }
 
 // ---------- queue & playback ----------
@@ -461,6 +466,7 @@ pub fn run() {
             get_status,
             get_queue,
             queue_edit,
+            search,
             set_play_mode,
         ])
         .run(tauri::generate_context!())

@@ -3,6 +3,7 @@
   import { player, setTheme, ui } from "../lib/state.svelte";
   import Icon from "./Icon.svelte";
   import Logo from "./Logo.svelte";
+  import Search from "./Search.svelte";
 
   const mac = navigator.userAgent.includes("Mac");
   const view = $derived(ui.base);
@@ -50,6 +51,7 @@
   </nav>
 
   <div class="right">
+    <Search />
   </div>
 </header>
 

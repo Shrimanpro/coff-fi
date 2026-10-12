@@ -11,6 +11,10 @@ export const ui = $state({
   base: "home" as "home" | "directory",
   dirPath: null as string | null,
   collection: null as { kind: TileKind; id: string } | null,
+  /** The centred search palette (Cmd/Ctrl+K). */
+  palette: false,
+  /** A song to scroll to and highlight once its album opens ("go to track"). */
+  focusTrack: null as number | null,
   leftPinned: false,
   theme: (document.documentElement.dataset.theme as "dark" | "light") || (matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark"),
   scanning: false,
@@ -139,6 +143,12 @@ export function openTile(t: Tile) {
   } else {
     ui.collection = { kind: t.kind, id: t.id };
   }
+}
+
+/** Opens the song's album (or its folder) and highlights the song there. */
+export function goToTrack(t: Track) {
+  ui.focusTrack = t.id;
+  ui.collection = t.album ? { kind: "album", id: `${t.album_artist}\u001f${t.album}` } : { kind: "folder", id: t.dir };
 }
 
 export function tileMenu(e: MouseEvent, t: Tile) {
