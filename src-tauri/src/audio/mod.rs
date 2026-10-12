@@ -292,6 +292,10 @@ impl Engine {
             Cmd::Load { id, start, play } => {
                 if let Err(e) = self.load(id, start, play) {
                     (self.emit)(Event::Error(format!("{e:#}")));
+                    // Without an output device every track would fail; only skip genuinely broken files.
+                    if self.out.is_some() {
+                        self.skip_broken(id);
+                    }
                 }
             }
             Cmd::SetPlaying(on) => self.set_playing(on),
@@ -324,6 +328,18 @@ impl Engine {
         match id {
             Some(id) => self.handle(Cmd::Load { id, start: 0.0, play: true }),
             None => self.stop(),
+        }
+    }
+
+    /// A file failed to open: move past it rather than stalling.
+    fn skip_broken(&mut self, id: i64) {
+        let next = {
+            let mut q = self.queue.lock();
+            if q.current() == Some(id) && q.pos + 1 < q.items.len() { q.skip_next() } else { None }
+        };
+        match next {
+            Some(n) if n != id => self.handle(Cmd::Load { id: n, start: 0.0, play: true }),
+            _ => self.stop(),
         }
     }
 
