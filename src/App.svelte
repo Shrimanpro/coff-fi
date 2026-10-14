@@ -4,6 +4,7 @@
   import EdgePanel from "./components/EdgePanel.svelte";
   import MiniPlayer from "./components/MiniPlayer.svelte";
   import QueueSidebar from "./components/QueueSidebar.svelte";
+  import Settings from "./components/settings/Settings.svelte";
   import Toast from "./components/Toast.svelte";
   import TopBar from "./components/TopBar.svelte";
   import TreeSidebar from "./components/TreeSidebar.svelte";
@@ -44,6 +45,7 @@
   }
 
   function onMove(e: MouseEvent) {
+    if (ui.settingsOpen) return;
     if (e.clientX <= EDGE && e.clientY > 60) reveal("left");
     else if (e.clientX >= innerWidth - EDGE && e.clientY > 60) reveal("right");
   }
@@ -67,6 +69,7 @@
       if (player.status.track_id != null || player.track) api.cmd("toggle");
     } else if (mod && e.key === "ArrowRight") api.cmd("next");
     else if (mod && e.key === "ArrowLeft") api.cmd("prev");
+    else if (mod && e.key === ",") ui.settingsOpen = true;
   }
 
   // Start each page at the top.
@@ -106,6 +109,10 @@
 </EdgePanel>
 
 <MiniPlayer />
+
+{#if ui.settingsOpen}
+  <Settings />
+{/if}
 
 <ContextMenu />
 <Toast />

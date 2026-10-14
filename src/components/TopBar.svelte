@@ -37,6 +37,7 @@
       <span class="word">Coff-fi</span>
     </div>
     <span class="sep"></span>
+    <button class="icon-btn" title="Settings" onclick={() => (ui.settingsOpen = true)}><Icon name="gear" /></button>
     <button class="icon-btn theme" title={ui.theme === "dark" ? "Light mode" : "Dark mode"} onclick={() => setTheme(ui.theme === "dark" ? "light" : "dark")}>
       {#key ui.theme}
         <span class="swap"><Icon name={ui.theme === "dark" ? "sun" : "moon"} /></span>

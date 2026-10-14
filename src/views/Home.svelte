@@ -1,10 +1,9 @@
 <script lang="ts">
-  import { open } from "@tauri-apps/plugin-dialog";
   import SongRow from "../components/SongRow.svelte";
   import TileC from "../components/Tile.svelte";
   import VirtualList from "../components/VirtualList.svelte";
   import { api } from "../lib/ipc";
-  import { conf, playTracks, toast, ui } from "../lib/state.svelte";
+  import { playTracks, toast, ui } from "../lib/state.svelte";
   import type { Home, Tile } from "../lib/types";
 
   let { scroller }: { scroller: HTMLElement | null } = $props();
@@ -17,14 +16,6 @@
     ui.libVersion;
     api.home().then((h) => (data = h)).catch((e) => toast(String(e)));
   });
-
-  async function addFolder() {
-    const dir = await open({ directory: true, multiple: false, title: "Choose a music folder" });
-    if (typeof dir !== "string" || !conf.s || conf.s.roots.includes(dir)) return;
-    conf.s.roots = [...conf.s.roots, dir];
-    await api.setSettings($state.snapshot(conf.s)).catch((e) => toast(String(e)));
-    api.rescan();
-  }
 
   const greeting = (() => {
     const h = new Date().getHours();
@@ -46,8 +37,8 @@
   {:else if data.songs.length === 0}
     <div class="empty">
       <h2>Your shelves are empty</h2>
-      <p>{ui.scanning ? "Scanning your music folder…" : "Pick a music folder to start listening."}</p>
-      <button class="pill-btn" onclick={addFolder}>Choose a folder</button>
+      <p>{ui.scanning ? "Scanning your music folder…" : "Pick a music folder in Settings to start listening."}</p>
+      <button class="pill-btn" onclick={() => (ui.settingsOpen = true)}>Open settings</button>
     </div>
   {:else}
     {#if data.albums.length}

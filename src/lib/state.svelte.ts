@@ -11,6 +11,7 @@ export const ui = $state({
   base: "home" as "home" | "directory",
   dirPath: null as string | null,
   collection: null as { kind: TileKind; id: string } | null,
+  settingsOpen: false,
   /** The centred search palette (Cmd/Ctrl+K). */
   palette: false,
   /** A song to scroll to and highlight once its album opens ("go to track"). */
@@ -61,6 +62,15 @@ export function openMenu(e: MouseEvent, items: MenuItem[]) {
   ui.menu = { x: e.clientX, y: e.clientY, items };
 }
 
+let saveTimer: ReturnType<typeof setTimeout> | undefined;
+/** Persists settings (debounced so sliders stay smooth). */
+export function saveSettings(delay = 120) {
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(() => {
+    if (conf.s) api.setSettings($state.snapshot(conf.s) as Settings).catch((e) => toast(String(e)));
+  }, delay);
+}
+
 async function refreshQueue() {
   Object.assign(queue, await api.queue());
 }
@@ -91,6 +101,9 @@ export async function init() {
     }),
     on("queue://changed", () => {
       refreshQueue();
+    }),
+    listen("settings://changed", async () => {
+      conf.s = await api.getSettings();
     }),
     on("library://changed", () => {
       ui.libVersion++;

@@ -79,6 +79,7 @@
   }
 
   async function openPalette() {
+    ui.settingsOpen = false;
     input?.blur();
     if (ui.palette) {
       pinput?.select();
