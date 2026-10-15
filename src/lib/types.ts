@@ -67,9 +67,24 @@ export interface QueueView {
   tracks: Track[];
 }
 
+export interface EqSettings {
+  enabled: boolean;
+  preamp: number;
+  bands: number[];
+  preset: string;
+}
+
+export interface EqPreset {
+  name: string;
+  preamp: number;
+  bands: number[];
+}
+
 export interface Settings {
   roots: string[];
   excluded: string[];
+  eq: EqSettings;
+  eq_presets: EqPreset[];
   volume: number;
   shuffle: boolean;
   repeat: Repeat;

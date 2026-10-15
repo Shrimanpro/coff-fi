@@ -1,4 +1,5 @@
 pub(crate) mod decoder;
+pub mod eq;
 pub mod output;
 
 use std::collections::VecDeque;
@@ -16,6 +17,7 @@ use crate::library::db;
 use crate::queue::Queue;
 use crate::settings;
 use decoder::Decoder;
+use eq::Equalizer;
 use output::Output;
 
 pub enum Cmd {
@@ -27,6 +29,7 @@ pub enum Cmd {
     Prev,
     Stop,
     Volume(f32),
+    Eq(settings::Eq),
 }
 
 #[derive(Clone, Debug, Default, Serialize, PartialEq)]
@@ -55,7 +58,7 @@ impl Player {
         let (tx, rx) = unbounded();
         let queue = Arc::new(Mutex::new(queue));
         let status = Arc::new(RwLock::new(Status::default()));
-        let init = Init { volume: s.volume };
+        let init = Init { eq: s.eq.clone(), volume: s.volume };
         let (q, st) = (queue.clone(), status.clone());
         std::thread::Builder::new()
             .name("player".into())
@@ -73,6 +76,7 @@ impl Player {
 }
 
 struct Init {
+    eq: settings::Eq,
     volume: f32,
 }
 
@@ -193,6 +197,8 @@ struct Engine {
     emit: Box<dyn Fn(Event) + Send>,
     out: Option<Output>,
     volume: f32,
+    eq_cfg: settings::Eq,
+    eq: Option<Equalizer>,
     cur: Option<Src>,
     written: u64,
     bounds: VecDeque<Boundary>,
@@ -218,6 +224,8 @@ impl Engine {
             emit,
             out: None,
             volume: i.volume,
+            eq_cfg: i.eq,
+            eq: None,
             cur: None,
             written: 0,
             bounds: VecDeque::new(),
@@ -281,6 +289,7 @@ impl Engine {
     fn ensure_output(&mut self) -> Result<()> {
         if self.out.is_none() {
             let o = Output::open(self.volume)?;
+            self.eq = Some(Equalizer::new(&self.eq_cfg, o.rate));
             self.written = o.played();
             self.out = Some(o);
         }
@@ -319,6 +328,10 @@ impl Engine {
                 if let Some(o) = &self.out {
                     o.set_volume(v);
                 }
+            }
+            Cmd::Eq(e) => {
+                self.eq = Some(Equalizer::new(&e, self.rate()));
+                self.eq_cfg = e;
             }
         }
         self.publish(true);
@@ -443,6 +456,9 @@ impl Engine {
 
             if self.mix.is_empty() {
                 break;
+            }
+            if let Some(eq) = &mut self.eq {
+                eq.process(&mut self.mix);
             }
             let o = self.out.as_mut().expect("output exists");
             if let Ok(chunk) = o.prod.write_chunk_uninit(self.mix.len()) {

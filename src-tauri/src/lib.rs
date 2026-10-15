@@ -55,6 +55,9 @@ fn set_settings(app: AppHandle, st: State<AppState>, settings: Settings) -> Res<
     if s.volume != old.volume {
         st.player.send(Cmd::Volume(s.volume));
     }
+    if s.eq != old.eq {
+        st.player.send(Cmd::Eq(s.eq.clone()));
+    }
     if s.shuffle != old.shuffle || s.repeat != old.repeat {
         {
             let mut q = st.player.queue.lock();

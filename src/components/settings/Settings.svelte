@@ -5,14 +5,101 @@
   import { api } from "../../lib/ipc";
   import { conf, saveSettings, toast, ui } from "../../lib/state.svelte";
   import Icon from "../Icon.svelte";
+  import VSlider from "./VSlider.svelte";
 
   type Tab = "eq" | "library" | "playback" | "integrations" | "navidrome" | "devices";
-  let tab = $state<Tab>("library");
+  let tab = $state<Tab>("eq");
   let version = $state("");
   // "0.8.0" → "v0.8"; a patch number only shows when it isn't zero.
   getVersion().then((v) => (version = `v${v.replace(/\.0$/, "")}`));
 
   const s = $derived(conf.s!);
+  const FREQS = ["31", "62", "125", "250", "500", "1k", "2k", "4k", "8k", "16k"];
+  const PRESETS: Record<string, number[]> = {
+    Flat: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+    "Bass Boost": [6, 5, 4, 2, 0, 0, 0, 0, 0, 0],
+    Warm: [3, 3, 2, 1, 0, -1, -1, 0, 1, 1],
+    "Lo-fi": [4, 3, 1, 0, -1, -2, -3, -4, -6, -8],
+    Vocal: [-2, -2, -1, 1, 3, 4, 3, 1, 0, -1],
+    Acoustic: [3, 3, 2, 1, 1, 1, 2, 3, 2, 1],
+    Classical: [4, 3, 2, 1, -1, -1, 0, 2, 3, 4],
+    Rock: [5, 3, -1, -2, -1, 2, 4, 5, 5, 5],
+    Treble: [0, 0, 0, 0, 0, 1, 2, 4, 5, 6],
+  };
+
+  // The selected preset keeps its name while you tweak; `modified` tells you the
+  // curve no longer matches it. Built-ins only define bands, customs add preamp.
+  const mine = $derived(s.eq_presets.find((p) => p.name === s.eq.preset));
+  const builtin = $derived(PRESETS[s.eq.preset]);
+  const modified = $derived(
+    mine ? mine.preamp !== s.eq.preamp || mine.bands.some((b, i) => b !== s.eq.bands[i]) : builtin ? builtin.some((b, i) => b !== s.eq.bands[i]) : true,
+  );
+  let naming = $state<"new" | "rename" | null>(null);
+  let draft = $state("");
+
+  function setBand(i: number, v: number) {
+    s.eq.bands[i] = v;
+    s.eq.enabled = true;
+    saveSettings();
+  }
+
+  function preset(name: string) {
+    const c = s.eq_presets.find((p) => p.name === name);
+    if (c) {
+      s.eq.bands = [...c.bands];
+      s.eq.preamp = c.preamp;
+    } else if (PRESETS[name]) {
+      s.eq.bands = [...PRESETS[name]];
+    } else return;
+    s.eq.preset = name;
+    s.eq.enabled = true;
+    naming = null;
+    saveSettings(0);
+  }
+
+  function startNaming(kind: "new" | "rename") {
+    naming = naming === kind ? null : kind;
+    draft = kind === "rename" ? s.eq.preset : "";
+  }
+
+  /** Saving over a custom preset overwrites it; anything else asks for a new name. */
+  function savePreset() {
+    if (mine) {
+      mine.bands = [...s.eq.bands];
+      mine.preamp = s.eq.preamp;
+      saveSettings(0);
+      toast(`Saved “${mine.name}”`);
+    } else startNaming("new");
+  }
+
+  function commitName() {
+    const n = draft.trim();
+    const taken = (x: string) => x.toLowerCase() === n.toLowerCase();
+    if (!n) return;
+    if (Object.keys(PRESETS).some(taken) || s.eq_presets.some((p) => p !== (naming === "rename" ? mine : null) && taken(p.name))) {
+      toast(`A preset called “${n}” already exists`);
+      return;
+    }
+    if (naming === "rename" && mine) mine.name = n;
+    else s.eq_presets = [...s.eq_presets, { name: n, preamp: s.eq.preamp, bands: [...s.eq.bands] }];
+    s.eq.preset = n;
+    naming = null;
+    saveSettings(0);
+    toast(`Saved “${n}”`);
+  }
+
+  function deletePreset() {
+    if (!mine) return;
+    const n = mine.name;
+    s.eq_presets = s.eq_presets.filter((p) => p !== mine);
+    s.eq.preset = "Flat";
+    s.eq.bands = [...PRESETS.Flat];
+    s.eq.preamp = 0;
+    naming = null;
+    saveSettings(0);
+    toast(`Deleted “${n}”`);
+  }
+
   async function addFolder(list: "roots" | "excluded") {
     const dir = await open({ directory: true, multiple: false, title: list === "roots" ? "Choose a music folder" : "Choose a folder to exclude" });
     if (typeof dir === "string" && !s[list].includes(dir)) {
@@ -37,7 +124,7 @@
 <div class="dialog glass" transition:scale={{ start: 0.96, duration: 260 }} role="dialog" aria-label="Settings">
   <nav>
     <h2>Settings</h2>
-    {#each [["library", "Library"]] as [id, label] (id)}
+    {#each [["eq", "Equalizer"], ["library", "Library"]] as [id, label] (id)}
       <button class:on={tab === id} onclick={() => (tab = id as Tab)}>{label}</button>
     {/each}
     {#if version}<span class="version">Coff-fi {version}</span>{/if}
@@ -46,7 +133,55 @@
   <section>
     <button class="icon-btn x" title="Close" onclick={close}><Icon name="close" /></button>
     {#if s}
-      {#if tab === "library"}
+      {#if tab === "eq"}
+        <h3>Equalizer</h3>
+        <div class="line">
+          <label class="switch"><input type="checkbox" bind:checked={s.eq.enabled} onchange={() => saveSettings(0)} /><span></span> Enabled</label>
+          <div class="presets">
+            <select value={builtin || mine ? s.eq.preset : ""} onchange={(e) => preset(e.currentTarget.value)}>
+              {#if !builtin && !mine}<option value="" disabled>Custom</option>{/if}
+              <optgroup label="Built-in">
+                {#each Object.keys(PRESETS) as p (p)}<option value={p}>{p}</option>{/each}
+              </optgroup>
+              {#if s.eq_presets.length}
+                <optgroup label="My presets">
+                  {#each s.eq_presets as p (p.name)}<option value={p.name}>{p.name}</option>{/each}
+                </optgroup>
+              {/if}
+            </select>
+            {#if modified && (builtin || mine)}<span class="mod">Modified</span>{/if}
+            <button class="icon-btn" title={mine ? `Save changes to “${mine.name}”` : "Save as a new preset"} disabled={!modified} onclick={savePreset}><Icon name="save" size={16} /></button>
+            {#if mine}
+              <button class="icon-btn" class:on={naming === "new"} title="Save as a new preset" onclick={() => startNaming("new")}><Icon name="plus" size={16} /></button>
+              <button class="icon-btn" class:on={naming === "rename"} title="Rename preset" onclick={() => startNaming("rename")}><Icon name="pencil" size={15} /></button>
+              <button class="icon-btn" title="Delete preset" onclick={deletePreset}><Icon name="trash" size={15} /></button>
+            {/if}
+          </div>
+        </div>
+        {#if naming}
+          <form class="name-form" onsubmit={(e) => (e.preventDefault(), commitName())}>
+            <!-- svelte-ignore a11y_autofocus -->
+            <input class="text" placeholder={naming === "rename" ? "New name" : "Name this preset"} maxlength="40" bind:value={draft} autofocus onkeydown={(e) => e.key === "Escape" && (e.stopPropagation(), (naming = null))} />
+            <button class="pill-btn" type="submit" disabled={!draft.trim()}>{naming === "rename" ? "Rename" : "Save"}</button>
+            <button class="pill-btn ghost" type="button" onclick={() => (naming = null)}>Cancel</button>
+          </form>
+        {/if}
+        <div class="eq" class:off={!s.eq.enabled}>
+          <VSlider
+            label="Pre"
+            value={s.eq.preamp}
+            onchange={(v) => {
+              s.eq.preamp = v;
+              saveSettings();
+            }}
+          />
+          <span class="eq-sep"></span>
+          {#each FREQS as f, i (f)}
+            <VSlider label={f} value={s.eq.bands[i]} onchange={(v) => setBand(i, v)} />
+          {/each}
+        </div>
+        <p class="help">Drag a band to shape the sound; double-click resets it. Changes apply instantly. Save a curve to keep it as your own preset.</p>
+      {:else if tab === "library"}
         <h3>Music folders</h3>
         <ul class="dirs">
           {#each s.roots as d (d)}
