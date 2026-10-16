@@ -124,7 +124,7 @@
 <div class="dialog glass" transition:scale={{ start: 0.96, duration: 260 }} role="dialog" aria-label="Settings">
   <nav>
     <h2>Settings</h2>
-    {#each [["eq", "Equalizer"], ["library", "Library"]] as [id, label] (id)}
+    {#each [["eq", "Equalizer"], ["library", "Library"], ["playback", "Playback"]] as [id, label] (id)}
       <button class:on={tab === id} onclick={() => (tab = id as Tab)}>{label}</button>
     {/each}
     {#if version}<span class="version">Coff-fi {version}</span>{/if}
@@ -204,6 +204,15 @@
         <div class="line">
           <button class="pill-btn" disabled={ui.scanning} onclick={() => api.rescan()}><Icon name="refresh" size={15} /> {ui.scanning ? "Scanning…" : "Rescan now"}</button>
         </div>
+      {:else if tab === "playback"}
+        <h3>Transitions</h3>
+        <label class="switch"><input type="checkbox" bind:checked={s.gapless} onchange={() => saveSettings(0)} /><span></span> Gapless playback</label>
+        <div class="range">
+          <span>Crossfade</span>
+          <input type="range" min="0" max="12" step="0.5" bind:value={s.crossfade} oninput={() => saveSettings(300)} />
+          <span class="v">{s.crossfade ? `${s.crossfade}s` : "Off"}</span>
+        </div>
+
       {/if}
     {/if}
   </section>

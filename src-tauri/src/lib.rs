@@ -13,7 +13,7 @@ use serde::Serialize;
 use tauri::http::{Request, Response, StatusCode};
 use tauri::{AppHandle, Emitter, Manager, State};
 
-use audio::{Cmd, Event, Player, Status};
+use audio::{Cmd, Event, PlaybackCfg, Player, Status};
 use library::{covers, db, scan, Collection, FolderView, Home, SearchResults, Tile};
 use queue::Queue;
 use settings::{Repeat, Settings};
@@ -57,6 +57,10 @@ fn set_settings(app: AppHandle, st: State<AppState>, settings: Settings) -> Res<
     }
     if s.eq != old.eq {
         st.player.send(Cmd::Eq(s.eq.clone()));
+    }
+    let cfg = PlaybackCfg::from(&s);
+    if cfg != PlaybackCfg::from(&old) {
+        st.player.send(Cmd::Config(cfg));
     }
     if s.shuffle != old.shuffle || s.repeat != old.repeat {
         {
@@ -230,6 +234,7 @@ fn queue_changed(app: &AppHandle, st: &AppState) {
     if let Err(e) = persist_current(&mut st.db.lock(), &q) {
         eprintln!("persist queue: {e}");
     }
+    st.player.send(Cmd::QueueChanged);
     let _ = app.emit("queue://changed", ());
 }
 

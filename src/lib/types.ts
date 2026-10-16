@@ -86,6 +86,8 @@ export interface Settings {
   eq: EqSettings;
   eq_presets: EqPreset[];
   volume: number;
+  gapless: boolean;
+  crossfade: number;
   shuffle: boolean;
   repeat: Repeat;
 }

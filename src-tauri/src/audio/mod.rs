@@ -3,6 +3,7 @@ pub mod eq;
 pub mod output;
 
 use std::collections::VecDeque;
+use std::f32::consts::FRAC_PI_2;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
@@ -20,6 +21,18 @@ use decoder::Decoder;
 use eq::Equalizer;
 use output::Output;
 
+#[derive(Clone, Debug, PartialEq)]
+pub struct PlaybackCfg {
+    pub gapless: bool,
+    pub crossfade: f32,
+}
+
+impl From<&settings::Settings> for PlaybackCfg {
+    fn from(s: &settings::Settings) -> Self {
+        Self { gapless: s.gapless, crossfade: s.crossfade }
+    }
+}
+
 pub enum Cmd {
     Load { id: i64, start: f64, play: bool },
     SetPlaying(bool),
@@ -30,6 +43,8 @@ pub enum Cmd {
     Stop,
     Volume(f32),
     Eq(settings::Eq),
+    Config(PlaybackCfg),
+    QueueChanged,
 }
 
 #[derive(Clone, Debug, Default, Serialize, PartialEq)]
@@ -58,7 +73,7 @@ impl Player {
         let (tx, rx) = unbounded();
         let queue = Arc::new(Mutex::new(queue));
         let status = Arc::new(RwLock::new(Status::default()));
-        let init = Init { eq: s.eq.clone(), volume: s.volume };
+        let init = Init { eq: s.eq.clone(), volume: s.volume, cfg: s.into() };
         let (q, st) = (queue.clone(), status.clone());
         std::thread::Builder::new()
             .name("player".into())
@@ -78,6 +93,7 @@ impl Player {
 struct Init {
     eq: settings::Eq,
     volume: f32,
+    cfg: PlaybackCfg,
 }
 
 /// Sinc resampler fed with interleaved stereo.
@@ -199,7 +215,12 @@ struct Engine {
     volume: f32,
     eq_cfg: settings::Eq,
     eq: Option<Equalizer>,
+    cfg: PlaybackCfg,
     cur: Option<Src>,
+    xf: Option<Src>,
+    xf_len: u64,
+    xf_pos: u64,
+    gap: u64,
     written: u64,
     bounds: VecDeque<Boundary>,
     ended: bool,
@@ -207,6 +228,7 @@ struct Engine {
     last_emit: Instant,
     last_status: Status,
     mix: Vec<f32>,
+    xbuf: Vec<f32>,
 }
 
 /// How far ahead of the device the engine decodes, in seconds.
@@ -226,7 +248,12 @@ impl Engine {
             volume: i.volume,
             eq_cfg: i.eq,
             eq: None,
+            cfg: i.cfg,
             cur: None,
+            xf: None,
+            xf_len: 0,
+            xf_pos: 0,
+            gap: 0,
             written: 0,
             bounds: VecDeque::new(),
             ended: false,
@@ -234,6 +261,7 @@ impl Engine {
             last_emit: Instant::now(),
             last_status: Status::default(),
             mix: Vec::new(),
+            xbuf: Vec::new(),
         }
     }
 
@@ -333,6 +361,18 @@ impl Engine {
                 self.eq = Some(Equalizer::new(&e, self.rate()));
                 self.eq_cfg = e;
             }
+            Cmd::Config(c) => {
+                self.cfg = c;
+            }
+            Cmd::QueueChanged => {
+                // If the next track was already pre-buffered, make sure it is still the right one.
+                let expected = self.queue.lock().peek_next();
+                let buffered = self.bounds.get(1).map(|b| b.id).or_else(|| self.xf.as_ref().map(|x| x.id));
+                let prefetched_next = self.cur.as_ref().map(|c| Some(c.id) != self.audible()).unwrap_or(false);
+                if (buffered.is_some() || prefetched_next) && buffered != expected {
+                    self.rebuild();
+                }
+            }
         }
         self.publish(true);
     }
@@ -371,6 +411,8 @@ impl Engine {
         }
         let changed = self.audible() != Some(id);
         self.cur = Some(src);
+        self.xf = None;
+        self.gap = 0;
         self.ended = false;
         self.bounds.clear();
         self.bounds.push_back(Boundary { at: self.written, id, start: actual, duration });
@@ -379,6 +421,16 @@ impl Engine {
         }
         self.set_playing(play);
         Ok(())
+    }
+
+    /// Re-decodes from the current position (used when buffered audio is stale).
+    fn rebuild(&mut self) {
+        if let Some(id) = self.audible() {
+            let pos = self.position();
+            if let Err(e) = self.load(id, pos, self.playing) {
+                (self.emit)(Event::Error(format!("{e:#}")));
+            }
+        }
     }
 
     fn seek(&mut self, s: f64) {
@@ -411,6 +463,7 @@ impl Engine {
         }
         self.playing = false;
         self.cur = None;
+        self.xf = None;
         self.bounds.clear();
         self.ended = false;
         (self.emit)(Event::Track(None));
@@ -426,6 +479,17 @@ impl Engine {
         (b.start + played as f64 / o.rate as f64).min(b.duration)
     }
 
+    fn next_src(&mut self) -> Option<(Src, f64, f64)> {
+        let next = self.queue.lock().peek_next()?;
+        match self.open_src(next, 0.0) {
+            Ok(s) => Some(s),
+            Err(e) => {
+                (self.emit)(Event::Error(format!("{e:#}")));
+                None
+            }
+        }
+    }
+
     fn fill(&mut self) {
         let Some(out) = &self.out else { return };
         if !out.flushed() {
@@ -438,19 +502,63 @@ impl Engine {
                 let buffered = self.written.saturating_sub(o.played());
                 (o.prod.slots() / 2).min(target.saturating_sub(buffered) as usize)
             });
-            if space < 256 || self.cur.is_none() {
+            if space < 256 || (self.cur.is_none() && self.gap == 0) {
                 break;
             }
             let n = space.min(4096);
             self.mix.clear();
 
-            if let Some(cur) = &mut self.cur {
+            if self.gap > 0 {
+                let g = (self.gap as usize).min(n);
+                self.mix.resize(g * 2, 0.0);
+                self.gap -= g as u64;
+            } else if let Some(cur) = &mut self.cur {
+                // Start a crossfade when the current track is close to its end.
+                let xf_frames = (self.cfg.crossfade.max(0.0) as f64 * rate as f64) as u64;
+                let start_xf = self.xf.is_none() && xf_frames > 0 && cur.remaining() <= xf_frames && !cur.exhausted();
+                let remaining = cur.remaining();
+                if start_xf {
+                    if let Some((src, start, dur)) = self.next_src() {
+                        self.bounds.push_back(Boundary { at: self.written, id: src.id, start, duration: dur });
+                        self.xf_len = remaining.max(1);
+                        self.xf_pos = 0;
+                        self.xf = Some(src);
+                    }
+                }
+                let cur = self.cur.as_mut().expect("checked above");
                 let got = cur.take(n, &mut self.mix);
-                if got < n && cur.exhausted() {
+                if let Some(x) = &mut self.xf {
+                    self.xbuf.clear();
+                    let gx = x.take(n, &mut self.xbuf);
+                    let len = got.max(gx);
+                    self.mix.resize(len * 2, 0.0);
+                    for i in 0..len {
+                        let t = ((self.xf_pos + i as u64) as f32 / self.xf_len as f32).min(1.0);
+                        let (a, b) = ((t * FRAC_PI_2).cos(), (t * FRAC_PI_2).sin());
+                        for c in 0..2 {
+                            let xs = self.xbuf.get(i * 2 + c).copied().unwrap_or(0.0);
+                            self.mix[i * 2 + c] = self.mix[i * 2 + c] * a + xs * b;
+                        }
+                    }
+                    self.xf_pos += len as u64;
+                    if self.cur.as_ref().is_some_and(Src::exhausted) {
+                        self.cur = self.xf.take();
+                    }
+                } else if got < n && cur.exhausted() {
+                    // Gapless hand-over to the next track.
                     let at = self.written + got as u64;
+                    match self.next_src() {
+                        Some((src, start, dur)) => {
+                            self.bounds.push_back(Boundary { at: at + self.gap_len(rate), id: src.id, start, duration: dur });
+                            self.gap = self.gap_len(rate);
+                            self.cur = Some(src);
+                        }
+                        None => {
                             self.cur = None;
                             self.ended = true;
                             self.bounds.push_back(Boundary { at, id: -1, start: 0.0, duration: 0.0 });
+                        }
+                    }
                 }
             }
 
@@ -468,6 +576,10 @@ impl Engine {
         }
     }
 
+    fn gap_len(&self, rate: u32) -> u64 {
+        if self.cfg.gapless { 0 } else { rate as u64 / 2 }
+    }
+
     /// Advances the audible track as the device plays past buffered boundaries.
     fn track_position(&mut self) {
         let Some(o) = &self.out else { return };
@@ -476,8 +588,7 @@ impl Engine {
             self.bounds.pop_front();
             let id = self.bounds[0].id;
             if id < 0 {
-                let next = self.queue.lock().advance();
-                self.load_or_stop(next);
+                self.stop();
                 return;
             }
             self.queue.lock().advance();

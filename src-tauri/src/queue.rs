@@ -83,6 +83,18 @@ impl Queue {
         }
     }
 
+    pub fn peek_next(&self) -> Option<i64> {
+        if self.items.is_empty() {
+            return None;
+        }
+        match self.repeat {
+            Repeat::One => self.current(),
+            _ if self.pos + 1 < self.items.len() => Some(self.items[self.pos + 1]),
+            Repeat::All => Some(self.items[0]),
+            Repeat::Off => None,
+        }
+    }
+
     /// Moves to the next track automatically (respects repeat-one).
     pub fn advance(&mut self) -> Option<i64> {
         if self.repeat == Repeat::One {
@@ -163,3 +175,66 @@ impl Queue {
     }
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn q(items: &[i64]) -> Queue {
+        let mut q = Queue::default();
+        q.set("t".into(), items.to_vec(), 0);
+        q
+    }
+
+    #[test]
+    fn next_and_repeat() {
+        let mut q = q(&[1, 2, 3]);
+        assert_eq!(q.peek_next(), Some(2));
+        q.advance();
+        q.advance();
+        assert_eq!(q.peek_next(), None);
+        q.repeat = Repeat::All;
+        assert_eq!(q.peek_next(), Some(1));
+        q.repeat = Repeat::One;
+        assert_eq!(q.advance(), Some(3));
+        assert_eq!(q.skip_next(), Some(1), "manual next escapes repeat-one");
+    }
+
+    #[test]
+    fn play_next_inserts_after_current() {
+        let mut q = q(&[1, 2, 3]);
+        q.jump(1);
+        q.add(&[9], true);
+        assert_eq!(q.items, vec![1, 2, 9, 3]);
+        q.add(&[8], false);
+        assert_eq!(q.items, vec![1, 2, 9, 3, 8]);
+    }
+
+    #[test]
+    fn shuffle_keeps_current_and_unshuffle_restores() {
+        let mut q = q(&(1..=50).collect::<Vec<_>>());
+        q.jump(10);
+        q.set_shuffle(true);
+        assert_eq!(q.current(), Some(11));
+        assert_eq!(q.pos, 0);
+        let mut sorted = q.items.clone();
+        sorted.sort();
+        assert_eq!(sorted, (1..=50).collect::<Vec<_>>());
+        q.add(&[99], true);
+        q.set_shuffle(false);
+        assert_eq!(q.current(), Some(11));
+        assert_eq!(q.items[..12], [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 99]);
+    }
+
+    #[test]
+    fn remove_and_move_track_position() {
+        let mut q = q(&[1, 2, 3, 4]);
+        q.jump(2);
+        q.remove(0);
+        assert_eq!(q.current(), Some(3));
+        q.move_item(1, 0);
+        assert_eq!(q.items, vec![3, 2, 4]);
+        assert_eq!(q.current(), Some(3));
+        q.remove(0);
+        assert_eq!(q.current(), Some(2));
+    }
+}

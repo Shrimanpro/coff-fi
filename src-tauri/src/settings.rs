@@ -44,6 +44,8 @@ pub struct Settings {
     pub eq: Eq,
     pub eq_presets: Vec<EqPreset>,
     pub volume: f32,
+    pub gapless: bool,
+    pub crossfade: f32,
     pub shuffle: bool,
     pub repeat: Repeat,
 }
@@ -56,6 +58,8 @@ impl Default for Settings {
             eq: Eq::default(),
             eq_presets: Vec::new(),
             volume: 0.8,
+            gapless: true,
+            crossfade: 0.0,
             shuffle: false,
             repeat: Repeat::Off,
         }
