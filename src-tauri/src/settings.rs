@@ -50,6 +50,7 @@ pub enum Repeat {
 pub struct Settings {
     pub roots: Vec<String>,
     pub excluded: Vec<String>,
+    pub watch: bool,
     pub eq: Eq,
     pub eq_presets: Vec<EqPreset>,
     pub volume: f32,
@@ -66,6 +67,7 @@ impl Default for Settings {
         Self {
             roots: Vec::new(),
             excluded: Vec::new(),
+            watch: true,
             eq: Eq::default(),
             eq_presets: Vec::new(),
             volume: 0.8,

@@ -20,6 +20,8 @@ use settings::{Repeat, Settings};
 
 type Res<T> = Result<T, String>;
 
+type Watcher = library::watch::Watcher;
+
 fn err(e: impl std::fmt::Display) -> String {
     e.to_string()
 }
@@ -31,6 +33,7 @@ pub struct AppState {
     cfg_db: Mutex<Connection>,
     settings: RwLock<Settings>,
     player: Player,
+    watcher: Mutex<Option<Watcher>>,
     scanning: AtomicBool,
     rescan_pending: AtomicBool,
 }
@@ -70,7 +73,8 @@ fn set_settings(app: AppHandle, st: State<AppState>, settings: Settings) -> Res<
         }
         queue_changed(&app, &st);
     }
-    if s.roots != old.roots || s.excluded != old.excluded {
+    if s.roots != old.roots || s.excluded != old.excluded || s.watch != old.watch {
+        start_watcher(&app, &st);
         rescan_now(&app);
     }
     Ok(())
@@ -152,6 +156,19 @@ fn rescan_now(app: &AppHandle) {
         st.scanning.store(false, Ordering::Release);
         let _ = app.emit("library://scanning", false);
     });
+}
+
+fn start_watcher(app: &AppHandle, st: &AppState) {
+    let s = st.settings.read().clone();
+    let mut w = st.watcher.lock();
+    *w = None;
+    if s.watch {
+        let handle = app.clone();
+        match library::watch::watch(&s.roots, move || rescan_now(&handle)) {
+            Ok(x) => *w = Some(x),
+            Err(e) => eprintln!("watcher: {e}"),
+        }
+    }
 }
 
 #[tauri::command]
@@ -453,9 +470,12 @@ pub fn run() {
                 cfg_db: Mutex::new(cfg_conn),
                 settings: RwLock::new(s),
                 player,
+                watcher: Mutex::new(None),
                 scanning: AtomicBool::new(false),
                 rescan_pending: AtomicBool::new(false),
             });
+            let st = app.state::<AppState>();
+            start_watcher(app.handle(), &st);
             rescan_now(app.handle());
             Ok(())
         })

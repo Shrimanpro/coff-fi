@@ -201,6 +201,7 @@
         <button class="pill-btn ghost" onclick={() => addFolder("excluded")}><Icon name="plus" size={15} /> Exclude folder</button>
 
         <h3>Scanning</h3>
+          <label class="switch"><input type="checkbox" bind:checked={s.watch} onchange={() => saveSettings(0)} /><span></span> Watch folders for changes</label>
         <div class="line">
           <button class="pill-btn" disabled={ui.scanning} onclick={() => api.rescan()}><Icon name="refresh" size={15} /> {ui.scanning ? "Scanning…" : "Rescan now"}</button>
         </div>

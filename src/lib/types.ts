@@ -83,6 +83,7 @@ export interface EqPreset {
 export interface Settings {
   roots: string[];
   excluded: string[];
+  watch: boolean;
   eq: EqSettings;
   eq_presets: EqPreset[];
   volume: number;

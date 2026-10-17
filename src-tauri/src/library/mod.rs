@@ -2,6 +2,7 @@ pub mod covers;
 pub mod db;
 pub mod scan;
 pub mod tags;
+pub mod watch;
 
 use std::collections::{BTreeMap, HashMap};
 use std::path::MAIN_SEPARATOR;
