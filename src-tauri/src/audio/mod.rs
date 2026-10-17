@@ -16,7 +16,7 @@ use serde::Serialize;
 
 use crate::library::db;
 use crate::queue::Queue;
-use crate::settings;
+use crate::settings::{self, ReplayGain};
 use decoder::Decoder;
 use eq::Equalizer;
 use output::Output;
@@ -25,11 +25,13 @@ use output::Output;
 pub struct PlaybackCfg {
     pub gapless: bool,
     pub crossfade: f32,
+    pub replaygain: ReplayGain,
+    pub rg_preamp: f32,
 }
 
 impl From<&settings::Settings> for PlaybackCfg {
     fn from(s: &settings::Settings) -> Self {
-        Self { gapless: s.gapless, crossfade: s.crossfade }
+        Self { gapless: s.gapless, crossfade: s.crossfade, replaygain: s.replaygain, rg_preamp: s.rg_preamp }
     }
 }
 
@@ -151,6 +153,7 @@ struct Src {
     id: i64,
     dec: Decoder,
     rs: Option<Rs>,
+    gain: f32,
     pending: Vec<f32>,
     scratch: Vec<f32>,
     eof: bool,
@@ -159,13 +162,13 @@ struct Src {
 }
 
 impl Src {
-    fn open(path: &Path, id: i64, start: f64, duration: f64, rate: u32) -> Result<(Self, f64)> {
+    fn open(path: &Path, id: i64, start: f64, duration: f64, rate: u32, gain: f32) -> Result<(Self, f64)> {
         let mut dec = Decoder::open(path)?;
         let actual = if start > 0.05 { dec.seek(start).unwrap_or(0.0) } else { 0.0 };
         let ratio = rate as f64 / dec.sample_rate as f64;
         let rs = if (ratio - 1.0).abs() < 1e-9 { None } else { Some(Rs::new(ratio)?) };
         let total_frames = ((duration - actual).max(0.0) * rate as f64) as u64;
-        Ok((Self { id, dec, rs, pending: Vec::new(), scratch: Vec::new(), eof: false, out_frames: 0, total_frames }, actual))
+        Ok((Self { id, dec, rs, gain, pending: Vec::new(), scratch: Vec::new(), eof: false, out_frames: 0, total_frames }, actual))
     }
 
     fn remaining(&self) -> u64 {
@@ -181,6 +184,9 @@ impl Src {
         while self.pending.len() < n * 2 && !self.eof {
             self.scratch.clear();
             let more = self.dec.next_chunk(&mut self.scratch).unwrap_or(false);
+            if self.gain != 1.0 {
+                self.scratch.iter_mut().for_each(|s| *s *= self.gain);
+            }
             match &mut self.rs {
                 Some(rs) => {
                     if rs.push(&self.scratch, &mut self.pending, !more).is_err() {
@@ -362,7 +368,13 @@ impl Engine {
                 self.eq_cfg = e;
             }
             Cmd::Config(c) => {
+                let regain = c.replaygain != self.cfg.replaygain || c.rg_preamp != self.cfg.rg_preamp;
                 self.cfg = c;
+                if regain {
+                    if let Some(cur) = &mut self.cur {
+                        cur.gain = rg_gain(&self.conn, cur.id, &self.cfg);
+                    }
+                }
             }
             Cmd::QueueChanged => {
                 // If the next track was already pre-buffered, make sure it is still the right one.
@@ -398,7 +410,8 @@ impl Engine {
 
     fn open_src(&self, id: i64, start: f64) -> Result<(Src, f64, f64)> {
         let t = db::track(&self.conn, id)?.ok_or_else(|| anyhow!("track {id} is no longer in the library"))?;
-        let (src, actual) = Src::open(Path::new(&t.path), id, start, t.duration, self.rate())
+        let gain = rg_gain(&self.conn, id, &self.cfg);
+        let (src, actual) = Src::open(Path::new(&t.path), id, start, t.duration, self.rate(), gain)
             .map_err(|e| anyhow!("can't play \"{}\": {e}", t.title))?;
         Ok((src, actual, t.duration))
     }
@@ -616,6 +629,17 @@ impl Engine {
 
 fn wait_clamp(secs: f64) -> Duration {
     Duration::from_secs_f64(secs.clamp(0.005, 1.0))
+}
+
+fn rg_gain(conn: &rusqlite::Connection, id: i64, cfg: &PlaybackCfg) -> f32 {
+    let (t, a) = db::replaygain(conn, id).unwrap_or((None, None));
+    let g = match cfg.replaygain {
+        ReplayGain::Off => return 1.0,
+        ReplayGain::Track => t.or(a),
+        ReplayGain::Album => a.or(t),
+    };
+    // Untagged files get only the preamp; boosts are capped to limit clipping.
+    10f32.powf((g.unwrap_or(0.0) + cfg.rg_preamp) / 20.0).min(4.0)
 }
 
 #[cfg(test)]

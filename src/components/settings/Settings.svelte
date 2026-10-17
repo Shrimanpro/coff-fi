@@ -213,6 +213,19 @@
           <span class="v">{s.crossfade ? `${s.crossfade}s` : "Off"}</span>
         </div>
 
+        <h3>Volume normalization</h3>
+        <div class="seg">
+          {#each [["off", "Off"], ["track", "Track"], ["album", "Album"]] as [v, l] (v)}
+            <button class:on={s.replaygain === v} onclick={() => ((s.replaygain = v as typeof s.replaygain), saveSettings(0))}>{l}</button>
+          {/each}
+        </div>
+        <div class="range">
+          <span>Preamp</span>
+          <input type="range" min="-12" max="12" step="0.5" bind:value={s.rg_preamp} oninput={() => saveSettings(300)} />
+          <span class="v">{s.rg_preamp > 0 ? "+" : ""}{s.rg_preamp} dB</span>
+        </div>
+        <p class="help">Uses ReplayGain tags in your files.</p>
+
       {/if}
     {/if}
   </section>

@@ -88,6 +88,8 @@ export interface Settings {
   volume: number;
   gapless: boolean;
   crossfade: number;
+  replaygain: "off" | "track" | "album";
+  rg_preamp: number;
   shuffle: boolean;
   repeat: Repeat;
 }

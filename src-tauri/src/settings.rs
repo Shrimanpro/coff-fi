@@ -29,6 +29,15 @@ pub struct EqPreset {
 
 #[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq, Default)]
 #[serde(rename_all = "lowercase")]
+pub enum ReplayGain {
+    #[default]
+    Off,
+    Track,
+    Album,
+}
+
+#[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq, Default)]
+#[serde(rename_all = "lowercase")]
 pub enum Repeat {
     #[default]
     Off,
@@ -46,6 +55,8 @@ pub struct Settings {
     pub volume: f32,
     pub gapless: bool,
     pub crossfade: f32,
+    pub replaygain: ReplayGain,
+    pub rg_preamp: f32,
     pub shuffle: bool,
     pub repeat: Repeat,
 }
@@ -60,6 +71,8 @@ impl Default for Settings {
             volume: 0.8,
             gapless: true,
             crossfade: 0.0,
+            replaygain: ReplayGain::Off,
+            rg_preamp: 0.0,
             shuffle: false,
             repeat: Repeat::Off,
         }

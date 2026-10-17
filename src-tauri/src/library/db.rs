@@ -117,6 +117,13 @@ pub fn tracks_by_ids(conn: &Connection, ids: &[i64]) -> Result<Vec<Track>> {
     Ok(ids.iter().filter_map(|id| map.get(id).cloned()).collect())
 }
 
+pub fn replaygain(conn: &Connection, id: i64) -> Result<(Option<f32>, Option<f32>)> {
+    Ok(conn
+        .query_row("SELECT rg_track, rg_album FROM tracks WHERE id = ?1", [id], |r| Ok((r.get(0)?, r.get(1)?)))
+        .optional()?
+        .unwrap_or((None, None)))
+}
+
 pub fn get_setting(conn: &Connection, k: &str) -> Result<Option<String>> {
     Ok(conn.query_row("SELECT v FROM settings WHERE k = ?1", [k], |r| r.get(0)).optional()?)
 }
