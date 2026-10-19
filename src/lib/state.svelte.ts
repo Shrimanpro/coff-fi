@@ -11,6 +11,7 @@ export const ui = $state({
   base: "home" as "home" | "directory",
   dirPath: null as string | null,
   collection: null as { kind: TileKind; id: string } | null,
+  fullscreen: false,
   settingsOpen: false,
   /** The centred search palette (Cmd/Ctrl+K). */
   palette: false,
@@ -33,6 +34,56 @@ export const player = $state({
 export const queue = $state<QueueView>({ name: "", pos: 0, shuffle: false, repeat: "off", tracks: [] });
 
 export const conf = $state({ s: null as Settings | null });
+
+// ---------- back navigation ----------
+
+interface Loc {
+  base: "home" | "directory";
+  dirPath: string | null;
+  collection: { kind: TileKind; id: string } | null;
+}
+
+const here = (): Loc => ({ base: ui.base, dirPath: ui.dirPath, collection: ui.collection && { ...ui.collection } });
+const sameLoc = (a: Loc, b: Loc) =>
+  a.base === b.base && a.dirPath === b.dirPath && a.collection?.kind === b.collection?.kind && a.collection?.id === b.collection?.id;
+
+export const nav = $state({ canGoBack: false });
+const backStack: Loc[] = [];
+let current = here();
+let restoring = false;
+
+// Every page change (however it happened) becomes a history entry.
+$effect.root(() => {
+  $effect(() => {
+    const loc = here();
+    if (sameLoc(loc, current)) return;
+    // Directory view picks the only library folder by itself; don't make that a step to go back to.
+    const autoPick = loc.base === "directory" && current.base === "directory" && current.dirPath === null && !current.collection && !loc.collection;
+    if (!restoring && !autoPick) backStack.push(current);
+    if (backStack.length > 100) backStack.shift();
+    restoring = false;
+    current = loc;
+    nav.canGoBack = backStack.length > 0;
+  });
+});
+
+/** Returns to the previous page. False if there is nowhere to go back to. */
+export function goBack(): boolean {
+  const prev = backStack.pop();
+  nav.canGoBack = backStack.length > 0;
+  if (!prev) return false;
+  restoring = !sameLoc(prev, here());
+  ui.base = prev.base;
+  ui.dirPath = prev.dirPath;
+  ui.collection = prev.collection;
+  return true;
+}
+
+function clearHistory() {
+  backStack.length = 0;
+  current = here();
+  nav.canGoBack = false;
+}
 
 /** Smoothly interpolated playback position (status arrives on changes and every few seconds). */
 export function position(): number {
@@ -227,6 +278,9 @@ export async function shufflePlay(tracks: Track[], name: string) {
   }
   playTracks(tracks, Math.floor(Math.random() * tracks.length), name);
 }
+
+/** Non-reactive DOM anchors shared between the mini and fullscreen players (FLIP morph). */
+export const anchors = { miniArt: null as HTMLElement | null };
 
 // Shuffle / repeat / volume act on the device that's playing (this one or a controlled one).
 

@@ -1,7 +1,9 @@
 <script lang="ts">
   import { onMount } from "svelte";
+  import BackSwipe from "./components/BackSwipe.svelte";
   import ContextMenu from "./components/ContextMenu.svelte";
   import EdgePanel from "./components/EdgePanel.svelte";
+  import FullPlayer from "./components/FullPlayer.svelte";
   import MiniPlayer from "./components/MiniPlayer.svelte";
   import QueueSidebar from "./components/QueueSidebar.svelte";
   import Settings from "./components/settings/Settings.svelte";
@@ -9,7 +11,7 @@
   import TopBar from "./components/TopBar.svelte";
   import TreeSidebar from "./components/TreeSidebar.svelte";
   import { api } from "./lib/ipc";
-  import { init, player, toast, ui } from "./lib/state.svelte";
+  import { goBack, init, player, position, toast, ui } from "./lib/state.svelte";
   import CollectionView from "./views/CollectionView.svelte";
   import Directory from "./views/Directory.svelte";
   import Home from "./views/Home.svelte";
@@ -45,7 +47,7 @@
   }
 
   function onMove(e: MouseEvent) {
-    if (ui.settingsOpen) return;
+    if (ui.fullscreen || ui.settingsOpen) return;
     if (e.clientX <= EDGE && e.clientY > 60) reveal("left");
     else if (e.clientX >= innerWidth - EDGE && e.clientY > 60) reveal("right");
   }
@@ -64,11 +66,19 @@
     const tag = (e.target as HTMLElement)?.tagName;
     if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
     const mod = e.ctrlKey || e.metaKey;
+    // Back: Cmd+[ on macOS, Alt+Left elsewhere (the usual browser shortcuts).
+    if (!ui.fullscreen && !ui.settingsOpen && ((e.metaKey && e.key === "[") || (e.altKey && e.key === "ArrowLeft"))) {
+      e.preventDefault();
+      goBack();
+      return;
+    }
     if (e.code === "Space") {
       e.preventDefault();
       if (player.status.track_id != null || player.track) api.cmd("toggle");
     } else if (mod && e.key === "ArrowRight") api.cmd("next");
     else if (mod && e.key === "ArrowLeft") api.cmd("prev");
+    else if (ui.fullscreen && e.key === "ArrowRight") api.cmd("seek", position() + 5);
+    else if (ui.fullscreen && e.key === "ArrowLeft") api.cmd("seek", Math.max(0, position() - 5));
     else if (mod && e.key === ",") ui.settingsOpen = true;
   }
 
@@ -110,10 +120,15 @@
 
 <MiniPlayer />
 
+{#if ui.fullscreen && player.track}
+  <FullPlayer />
+{/if}
+
 {#if ui.settingsOpen}
   <Settings />
 {/if}
 
+<BackSwipe />
 <ContextMenu />
 <Toast />
 

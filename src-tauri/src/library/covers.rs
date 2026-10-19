@@ -90,6 +90,41 @@ pub fn blurred(conn: &Connection, cache: &Path, hash: &str) -> Result<PathBuf> {
     Ok(out)
 }
 
+/// Dominant colours via a few rounds of k-means on a 32×32 thumbnail, most common first.
+pub fn palette(conn: &Connection, cache: &Path, hash: &str) -> Result<Vec<String>> {
+    let img = image::open(thumb(conn, cache, hash, 96)?)?.resize_exact(32, 32, FilterType::Triangle);
+    let px: Vec<[f32; 3]> = img.pixels().map(|(_, _, p)| [p[0] as f32, p[1] as f32, p[2] as f32]).collect();
+    Ok(kmeans(&px, 4).into_iter().map(|c| format!("#{:02x}{:02x}{:02x}", c[0] as u8, c[1] as u8, c[2] as u8)).collect())
+}
+
+fn kmeans(px: &[[f32; 3]], k: usize) -> Vec<[f32; 3]> {
+    let mut centers: Vec<[f32; 3]> = (0..k).map(|i| px[i * px.len() / k]).collect();
+    let mut counts = vec![0usize; k];
+    for _ in 0..8 {
+        let mut sums = vec![[0f32; 3]; k];
+        counts.iter_mut().for_each(|c| *c = 0);
+        for p in px {
+            let best = (0..k)
+                .min_by(|&a, &b| dist(p, &centers[a]).total_cmp(&dist(p, &centers[b])))
+                .unwrap_or(0);
+            counts[best] += 1;
+            (0..3).for_each(|c| sums[best][c] += p[c]);
+        }
+        for i in 0..k {
+            if counts[i] > 0 {
+                centers[i] = sums[i].map(|s| s / counts[i] as f32);
+            }
+        }
+    }
+    let mut idx: Vec<usize> = (0..k).collect();
+    idx.sort_by_key(|&i| std::cmp::Reverse(counts[i]));
+    idx.into_iter().map(|i| centers[i]).collect()
+}
+
+fn dist(a: &[f32; 3], b: &[f32; 3]) -> f32 {
+    (0..3).map(|i| (a[i] - b[i]).powi(2)).sum()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -99,6 +134,15 @@ mod tests {
         assert_eq!(snap(10), 96);
         assert_eq!(snap(200), 256);
         assert_eq!(snap(5000), 640);
+    }
+
+    #[test]
+    fn kmeans_finds_two_colours() {
+        let mut px = vec![[255.0, 0.0, 0.0]; 70];
+        px.extend(vec![[0.0, 0.0, 255.0]; 30]);
+        let c = kmeans(&px, 2);
+        assert_eq!(c[0], [255.0, 0.0, 0.0]);
+        assert_eq!(c[1], [0.0, 0.0, 255.0]);
     }
 
     #[test]

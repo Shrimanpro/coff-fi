@@ -2,7 +2,7 @@
   import { revealItemInDir } from "@tauri-apps/plugin-opener";
   import { quality } from "../lib/format";
   import { blurSrc } from "../lib/ipc";
-  import { enqueueTracks, openMenu, player, setVolume, toast, ui, volume } from "../lib/state.svelte";
+  import { anchors, enqueueTracks, openMenu, player, setVolume, toast, ui, volume } from "../lib/state.svelte";
   import Cover from "./Cover.svelte";
   import Icon from "./Icon.svelte";
   import Scrubber from "./Scrubber.svelte";
@@ -11,12 +11,16 @@
   const t = $derived(player.track);
   const show = $derived(!!t && player.status.track_id != null);
   let volOpen = $state(false);
+  let art: HTMLDivElement;
+  $effect(() => {
+    anchors.miniArt = art;
+  });
 
   function more(e: MouseEvent) {
     if (!t) return;
     const tr = t;
     openMenu(e, [
-      { label: "Go to album", action: () => (ui.collection = { kind: "album", id: `${tr.album_artist}\u001f${tr.album}` }) },
+      { label: "Go to album", action: () => ((ui.fullscreen = false), (ui.collection = { kind: "album", id: `${tr.album_artist}\u001f${tr.album}` })) },
       { label: "Go to artist", action: () => (ui.collection = { kind: "artist", id: tr.artist }) },
       { label: "Open folder", action: () => ((ui.collection = null), (ui.base = "directory"), (ui.dirPath = tr.dir)) },
       { label: "Play again next", action: () => enqueueTracks([tr], true) },
@@ -36,13 +40,21 @@
 <div
   class="mini glass"
   class:show
+  role="button"
+  tabindex="0"
+  aria-label="Open full player"
+  onclick={(e) => {
+    // Controls inside the bar handle their own clicks.
+    if (!(e.target as Element).closest("button, input, [role=slider]")) ui.fullscreen = true;
+  }}
+  onkeydown={(e) => e.key === "Enter" && (ui.fullscreen = true)}
   onmouseleave={() => (volOpen = false)}
 >
   {#if t?.cover}
     <img class="tint" src={blurSrc(t.cover)} alt="" />
   {/if}
   <div class="row">
-    <div class="art"><Cover covers={t?.cover ?? null} size={96} radius={9} /></div>
+    <div class="art" bind:this={art}><Cover covers={t?.cover ?? null} size={96} radius={9} /></div>
     <div class="meta">
       <div class="title ellipsis">{t?.title ?? ""}</div>
       <div class="artist ellipsis">{t?.artist ?? ""}{t?.album ? ` — ${t.album}` : ""}</div>

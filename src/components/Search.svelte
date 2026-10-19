@@ -79,6 +79,7 @@
   }
 
   async function openPalette() {
+    ui.fullscreen = false;
     ui.settingsOpen = false;
     input?.blur();
     if (ui.palette) {

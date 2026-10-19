@@ -9,6 +9,7 @@ export const api = {
   roots: () => invoke<Tile[]>("get_roots"),
   folder: (path: string) => invoke<FolderView>("get_folder", { path }),
   collection: (kind: string, id: string) => invoke<Collection>("get_collection", { kind, id }),
+  palette: (hash: string) => invoke<string[]>("get_palette", { hash }),
   playTracks: (ids: number[], start: number, name: string) => invoke<void>("play_tracks", { ids, start, name }),
   enqueue: (ids: number[], next: boolean) => invoke<void>("enqueue", { ids, next }),
   cmd: (cmd: string, value?: number) => invoke<void>("player_cmd", { cmd, value }),

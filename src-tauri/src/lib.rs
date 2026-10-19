@@ -202,6 +202,16 @@ async fn search(st: State<'_, AppState>, query: String) -> Res<SearchResults> {
     library::search(&st.db.lock(), &query).map_err(err)
 }
 
+#[tauri::command]
+async fn get_palette(hash: String) -> Res<Vec<String>> {
+    tauri::async_runtime::spawn_blocking(move || {
+        PROTO_CONN.with(|c| with_proto_conn(c, |conn, thumbs| covers::palette(conn, thumbs, &hash)))
+    })
+    .await
+    .map_err(err)?
+    .map_err(err)
+}
+
 // ---------- queue & playback ----------
 
 #[derive(Serialize)]
@@ -488,6 +498,7 @@ pub fn run() {
             get_roots,
             get_folder,
             get_collection,
+            get_palette,
             play_tracks,
             enqueue,
             player_cmd,
