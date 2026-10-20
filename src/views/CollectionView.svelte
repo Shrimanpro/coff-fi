@@ -12,6 +12,7 @@
   let data = $state<Collection | null>(null);
   $effect(() => {
     ui.libVersion;
+    ui.statsVersion;
     api.collection(kind, id).then((c) => (data = c)).catch((e) => toast(String(e)));
   });
 

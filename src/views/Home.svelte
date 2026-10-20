@@ -14,6 +14,7 @@
 
   $effect(() => {
     ui.libVersion;
+    ui.statsVersion;
     api.home().then((h) => (data = h)).catch((e) => toast(String(e)));
   });
 
@@ -41,6 +42,14 @@
       <button class="pill-btn" onclick={() => (ui.settingsOpen = true)}>Open settings</button>
     </div>
   {:else}
+    <section>
+      <div class="grid big">
+        {#each data.playlists as t (t.id)}
+          <TileC tile={t} size={640} />
+        {/each}
+      </div>
+    </section>
+
     {#if data.albums.length}
       <section>
         <div class="sec-head">

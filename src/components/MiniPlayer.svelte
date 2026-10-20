@@ -1,7 +1,7 @@
 <script lang="ts">
   import { revealItemInDir } from "@tauri-apps/plugin-opener";
   import { quality } from "../lib/format";
-  import { blurSrc } from "../lib/ipc";
+  import { api, blurSrc } from "../lib/ipc";
   import { anchors, enqueueTracks, openMenu, player, setVolume, toast, ui, volume } from "../lib/state.svelte";
   import Cover from "./Cover.svelte";
   import Icon from "./Icon.svelte";
@@ -15,6 +15,10 @@
   $effect(() => {
     anchors.miniArt = art;
   });
+
+  async function fav() {
+    if (t) player.fav = await api.toggleFavorite(t.id);
+  }
 
   function more(e: MouseEvent) {
     if (!t) return;
@@ -59,6 +63,9 @@
       <div class="title ellipsis">{t?.title ?? ""}</div>
       <div class="artist ellipsis">{t?.artist ?? ""}{t?.album ? ` — ${t.album}` : ""}</div>
     </div>
+    <button class="icon-btn" class:on={player.fav} title={player.fav ? "Unfavorite" : "Favorite"} onclick={fav}>
+      <Icon name={player.fav ? "star-fill" : "star"} />
+    </button>
     <button class="icon-btn" title="More" onclick={more}><Icon name="more" /></button>
 
     <div class="center"><Transport /></div>

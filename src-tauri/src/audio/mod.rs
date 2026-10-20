@@ -60,6 +60,8 @@ pub struct Status {
 pub enum Event {
     State(Status),
     Track(Option<i64>),
+    /// Fired once per listen when the play counts (30 s or half the track).
+    Played(i64),
     Error(String),
 }
 
@@ -231,6 +233,7 @@ struct Engine {
     bounds: VecDeque<Boundary>,
     ended: bool,
     playing: bool,
+    counted: bool,
     last_emit: Instant,
     last_status: Status,
     mix: Vec<f32>,
@@ -264,6 +267,7 @@ impl Engine {
             bounds: VecDeque::new(),
             ended: false,
             playing: false,
+            counted: false,
             last_emit: Instant::now(),
             last_status: Status::default(),
             mix: Vec::new(),
@@ -312,6 +316,12 @@ impl Engine {
         let mut secs = buffered.saturating_sub(self.target() / 2) as f64 / rate;
         if let Some(b) = self.bounds.get(1) {
             secs = secs.min(b.at.saturating_sub(played) as f64 / rate);
+        }
+        if !self.counted {
+            if let Some(b) = self.bounds.front().filter(|b| b.duration > 0.0) {
+                let need = (b.duration * 0.5).min(30.0);
+                secs = secs.min((need - self.position()).max(0.0));
+            }
         }
         wait_clamp(secs)
     }
@@ -429,6 +439,9 @@ impl Engine {
         self.ended = false;
         self.bounds.clear();
         self.bounds.push_back(Boundary { at: self.written, id, start: actual, duration });
+        if changed || start < 0.05 {
+            self.counted = false;
+        }
         if changed {
             (self.emit)(Event::Track(Some(id)));
         }
@@ -600,12 +613,22 @@ impl Engine {
         while self.bounds.len() > 1 && played >= self.bounds[1].at {
             self.bounds.pop_front();
             let id = self.bounds[0].id;
+            self.counted = false;
             if id < 0 {
                 self.stop();
                 return;
             }
             self.queue.lock().advance();
             (self.emit)(Event::Track(Some(id)));
+        }
+        if !self.counted {
+            if let Some(b) = self.bounds.front() {
+                let need = (b.duration * 0.5).min(30.0);
+                if b.duration > 0.0 && self.position() >= need {
+                    self.counted = true;
+                    (self.emit)(Event::Played(b.id));
+                }
+            }
         }
     }
 

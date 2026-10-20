@@ -21,6 +21,7 @@ export const ui = $state({
   theme: (document.documentElement.dataset.theme as "dark" | "light") || (matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark"),
   scanning: false,
   libVersion: 0,
+  statsVersion: 0,
   toast: null as string | null,
   menu: null as { x: number; y: number; items: MenuItem[] } | null,
 });
@@ -29,6 +30,7 @@ export const player = $state({
   status: { track_id: null, playing: false, position: 0, duration: 0 } as Status,
   track: null as Track | null,
   at: performance.now(),
+  fav: false,
 });
 
 export const queue = $state<QueueView>({ name: "", pos: 0, shuffle: false, repeat: "off", tracks: [] });
@@ -126,12 +128,17 @@ async function refreshQueue() {
   Object.assign(queue, await api.queue());
 }
 
+async function refreshFav() {
+  player.fav = player.track ? await api.isFavorite(player.track.id) : false;
+}
+
 /** Loads the player, queue and sleep timer of whichever device the UI is showing. */
 async function syncPlayer() {
   const [st] = await Promise.all([api.status(), refreshQueue()]);
   player.status = st;
   player.at = performance.now();
   player.track = st.track_id != null ? (queue.tracks.find((t) => t.id === st.track_id) ?? null) : null;
+  refreshFav();
 }
 
 function on<T>(name: string, fn: (payload: T) => void) {
@@ -149,6 +156,7 @@ export async function init() {
     }),
     on<Track | null>("player://track", (p) => {
       player.track = p;
+      refreshFav();
     }),
     on("queue://changed", () => {
       refreshQueue();
@@ -156,11 +164,19 @@ export async function init() {
     listen("settings://changed", async () => {
       conf.s = await api.getSettings();
     }),
+    on<[number, boolean]>("player://favorite", (p) => {
+      if (player.track?.id === p[0]) player.fav = p[1];
+      ui.statsVersion++;
+    }),
     on("library://changed", () => {
       ui.libVersion++;
       refreshQueue();
     }),
     listen<boolean>("library://scanning", (e) => (ui.scanning = e.payload)),
+    on("stats://changed", () => {
+      ui.statsVersion++;
+      refreshFav();
+    }),
     listen<string>("app://error", (e) => toast(e.payload)),
   ]);
 }

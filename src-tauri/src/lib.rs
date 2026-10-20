@@ -33,6 +33,7 @@ pub struct AppState {
     cfg_db: Mutex<Connection>,
     settings: RwLock<Settings>,
     player: Player,
+    random: RwLock<Vec<i64>>,
     watcher: Mutex<Option<Watcher>>,
     scanning: AtomicBool,
     rescan_pending: AtomicBool,
@@ -139,12 +140,16 @@ fn rescan_now(app: &AppHandle) {
             let path = st.db_path.read().clone();
             match db::open(&path).and_then(|mut c| {
                 let stats = scan::scan(&mut c, &roots, &excluded)?;
-                Ok(stats)
+                Ok((stats, library::random_ids(&c)?))
             }) {
                 // The source may have changed while scanning; only publish results for the active one.
-                Ok(stats) => {
+                Ok((stats, random)) if *st.db_path.read() == path => {
+                    if stats.updated > 0 || stats.removed > 0 || st.random.read().is_empty() {
+                        *st.random.write() = random;
+                    }
                     let _ = app.emit("library://changed", &stats);
                 }
+                Ok(_) => {}
                 Err(e) => {
                     let _ = app.emit("app://error", format!("Library scan failed: {e:#}"));
                 }
@@ -178,7 +183,8 @@ fn rescan(app: AppHandle) {
 
 #[tauri::command]
 async fn get_home(st: State<'_, AppState>) -> Res<Home> {
-    library::home(&st.db.lock()).map_err(err)
+    let random = st.random.read().clone();
+    library::home(&st.db.lock(), &random).map_err(err)
 }
 
 #[tauri::command]
@@ -194,7 +200,8 @@ async fn get_folder(st: State<'_, AppState>, path: String) -> Res<FolderView> {
 
 #[tauri::command]
 async fn get_collection(st: State<'_, AppState>, kind: String, id: String) -> Res<Collection> {
-    library::collection(&st.db.lock(), &kind, &id).map_err(err)
+    let random = st.random.read().clone();
+    library::collection(&st.db.lock(), &kind, &id, &random).map_err(err)
 }
 
 #[tauri::command]
@@ -210,6 +217,22 @@ async fn get_palette(hash: String) -> Res<Vec<String>> {
     .await
     .map_err(err)?
     .map_err(err)
+}
+
+#[tauri::command]
+fn toggle_favorite(app: AppHandle, st: State<AppState>, id: i64) -> Res<bool> {
+    let fav = {
+        let conn = st.db.lock();
+        let fav = db::toggle_favorite(&conn, id).map_err(err)?;
+        fav
+    };
+    let _ = app.emit("stats://changed", ());
+    Ok(fav)
+}
+
+#[tauri::command]
+fn is_favorite(st: State<AppState>, id: i64) -> Res<bool> {
+    db::is_favorite(&st.db.lock(), id).map_err(err)
 }
 
 // ---------- queue & playback ----------
@@ -431,6 +454,13 @@ fn on_player_event(app: &AppHandle, e: Event) {
             let q = st.player.queue.lock().clone();
             let _ = persist_current(&mut st.db.lock(), &q);
         }
+        Event::Played(id) => {
+            {
+                let conn = st.db.lock();
+                let _ = db::record_play(&conn, id);
+            }
+            let _ = app.emit("stats://changed", ());
+        }
         Event::Error(msg) => {
             let _ = app.emit("app://error", msg);
         }
@@ -469,6 +499,7 @@ pub fn run() {
             *ACTIVE_DB.write() = Some(db_path.clone());
             let conn = db::open(&db_path)?;
             let q = load_current_queue(&conn, &s);
+            let random = library::random_ids(&conn).unwrap_or_default();
 
             let h = app.handle().clone();
             let player = Player::spawn(db_path.clone(), &s, q, move |e| on_player_event(&h, e));
@@ -480,6 +511,7 @@ pub fn run() {
                 cfg_db: Mutex::new(cfg_conn),
                 settings: RwLock::new(s),
                 player,
+                random: RwLock::new(random),
                 watcher: Mutex::new(None),
                 scanning: AtomicBool::new(false),
                 rescan_pending: AtomicBool::new(false),
@@ -499,6 +531,8 @@ pub fn run() {
             get_folder,
             get_collection,
             get_palette,
+            toggle_favorite,
+            is_favorite,
             play_tracks,
             enqueue,
             player_cmd,

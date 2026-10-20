@@ -35,6 +35,10 @@ CREATE INDEX IF NOT EXISTS tracks_album ON tracks(album, album_artist);
 CREATE INDEX IF NOT EXISTS tracks_artist ON tracks(artist);
 CREATE TABLE IF NOT EXISTS covers(hash TEXT PRIMARY KEY, path TEXT NOT NULL, embedded INTEGER NOT NULL);
 CREATE TABLE IF NOT EXISTS folder_covers(dir TEXT PRIMARY KEY, hash TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS plays(track_id INTEGER NOT NULL, ts INTEGER NOT NULL);
+CREATE INDEX IF NOT EXISTS plays_track ON plays(track_id);
+CREATE INDEX IF NOT EXISTS plays_ts ON plays(ts);
+CREATE TABLE IF NOT EXISTS favorites(track_id INTEGER PRIMARY KEY, ts INTEGER NOT NULL);
 CREATE TABLE IF NOT EXISTS queues(id INTEGER PRIMARY KEY, name TEXT NOT NULL, kind TEXT NOT NULL, pos INTEGER NOT NULL, updated_at INTEGER NOT NULL);
 CREATE TABLE IF NOT EXISTS queue_items(queue_id INTEGER NOT NULL, idx INTEGER NOT NULL, track_id INTEGER NOT NULL);
 CREATE INDEX IF NOT EXISTS queue_items_q ON queue_items(queue_id);
@@ -122,6 +126,25 @@ pub fn replaygain(conn: &Connection, id: i64) -> Result<(Option<f32>, Option<f32
         .query_row("SELECT rg_track, rg_album FROM tracks WHERE id = ?1", [id], |r| Ok((r.get(0)?, r.get(1)?)))
         .optional()?
         .unwrap_or((None, None)))
+}
+
+pub fn record_play(conn: &Connection, id: i64) -> Result<()> {
+    conn.execute("INSERT INTO plays(track_id, ts) VALUES(?1, ?2)", params![id, now()])?;
+    Ok(())
+}
+
+pub fn is_favorite(conn: &Connection, id: i64) -> Result<bool> {
+    Ok(conn.query_row("SELECT 1 FROM favorites WHERE track_id = ?1", [id], |_| Ok(())).optional()?.is_some())
+}
+
+pub fn toggle_favorite(conn: &Connection, id: i64) -> Result<bool> {
+    if is_favorite(conn, id)? {
+        conn.execute("DELETE FROM favorites WHERE track_id = ?1", [id])?;
+        Ok(false)
+    } else {
+        conn.execute("INSERT INTO favorites(track_id, ts) VALUES(?1, ?2)", params![id, now()])?;
+        Ok(true)
+    }
 }
 
 pub fn get_setting(conn: &Connection, k: &str) -> Result<Option<String>> {

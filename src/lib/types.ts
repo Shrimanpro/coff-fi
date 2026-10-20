@@ -28,6 +28,7 @@ export interface Tile {
 }
 
 export interface Home {
+  playlists: Tile[];
   albums: Tile[];
   artists: Tile[];
   songs: Track[];

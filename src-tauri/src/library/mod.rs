@@ -13,6 +13,15 @@ use serde::Serialize;
 
 use db::{tracks_where, Track};
 
+pub const SMART: [(&str, &str); 5] = [
+    ("recent_played", "Recently Played"),
+    ("recent_added", "Recently Added"),
+    ("most_played", "Most Played"),
+    ("random", "Random Mix"),
+    ("favorites", "Favorites"),
+];
+const SMART_LIMIT: usize = 50;
+
 #[derive(Serialize, Clone, Debug)]
 pub struct Tile {
     pub kind: &'static str,
@@ -25,6 +34,7 @@ pub struct Tile {
 
 #[derive(Serialize)]
 pub struct Home {
+    pub playlists: Vec<Tile>,
     pub albums: Vec<Tile>,
     pub artists: Vec<Tile>,
     pub songs: Vec<Track>,
@@ -72,6 +82,32 @@ fn norm_dir(path: &str) -> String {
     if t.is_empty() { path.to_string() } else { t.to_string() }
 }
 
+pub fn smart_tracks(conn: &Connection, id: &str, random: &[i64]) -> Result<Vec<Track>> {
+    let lim = SMART_LIMIT;
+    match id {
+        "recent_played" => tracks_where(
+            conn,
+            &format!("JOIN (SELECT track_id, MAX(ts) m FROM plays GROUP BY track_id) p ON p.track_id = t.id ORDER BY p.m DESC LIMIT {lim}"),
+            [],
+        ),
+        "recent_added" => tracks_where(conn, &format!("ORDER BY t.added_at DESC, t.mtime DESC LIMIT {lim}"), []),
+        "most_played" => tracks_where(
+            conn,
+            &format!("JOIN (SELECT track_id, COUNT(*) c FROM plays GROUP BY track_id) p ON p.track_id = t.id ORDER BY p.c DESC, t.title LIMIT {lim}"),
+            [],
+        ),
+        "favorites" => tracks_where(conn, "JOIN favorites f ON f.track_id = t.id ORDER BY f.ts DESC", []),
+        "random" => db::tracks_by_ids(conn, random),
+        _ => Ok(Vec::new()),
+    }
+}
+
+pub fn random_ids(conn: &Connection) -> Result<Vec<i64>> {
+    let mut st = conn.prepare(&format!("SELECT id FROM tracks ORDER BY RANDOM() LIMIT {SMART_LIMIT}"))?;
+    let rows = st.query_map([], |r| r.get(0))?;
+    Ok(rows.collect::<rusqlite::Result<_>>()?)
+}
+
 fn group_tiles(conn: &Connection, kind: &'static str, sql: &str) -> Result<Vec<Tile>> {
     group_tiles_p(conn, kind, sql, [])
 }
@@ -87,7 +123,19 @@ fn group_tiles_p(conn: &Connection, kind: &'static str, sql: &str, p: impl rusql
     Ok(rows.collect::<rusqlite::Result<_>>()?)
 }
 
-pub fn home(conn: &Connection) -> Result<Home> {
+pub fn home(conn: &Connection, random: &[i64]) -> Result<Home> {
+    let mut playlists = Vec::new();
+    for (id, name) in SMART {
+        let tracks = smart_tracks(conn, id, random)?;
+        playlists.push(Tile {
+            kind: "playlist",
+            id: id.into(),
+            name: name.into(),
+            subtitle: format!("{} songs", tracks.len()),
+            count: tracks.len(),
+            covers: first_covers(tracks.iter().map(|t| &t.cover), 4),
+        });
+    }
     let albums = group_tiles(
         conn,
         "album",
@@ -99,7 +147,7 @@ pub fn home(conn: &Connection) -> Result<Home> {
         "SELECT artist, '', COUNT(*), MAX(cover) FROM tracks GROUP BY artist ORDER BY artist COLLATE NOCASE",
     )?;
     let songs = tracks_where(conn, "ORDER BY t.title COLLATE NOCASE", [])?;
-    Ok(Home { albums, artists, songs })
+    Ok(Home { playlists, albums, artists, songs })
 }
 
 #[derive(Serialize)]
@@ -155,7 +203,21 @@ pub fn search(conn: &Connection, query: &str) -> Result<SearchResults> {
         p.as_slice(),
     )?;
 
+    let q = query.trim().to_lowercase();
     let mut playlists = Vec::new();
+    for (id, name) in SMART {
+        if name.to_lowercase().contains(&q) {
+            let tracks = smart_tracks(conn, id, &[])?;
+            playlists.push(Tile {
+                kind: "playlist",
+                id: id.into(),
+                name: name.into(),
+                subtitle: "Smart playlist".into(),
+                count: tracks.len(),
+                covers: first_covers(tracks.iter().map(|t| &t.cover), 4),
+            });
+        }
+    }
     Ok(SearchResults { songs, albums, artists, playlists })
 }
 
@@ -209,8 +271,12 @@ pub fn folder_view(conn: &Connection, path: &str) -> Result<FolderView> {
     Ok(FolderView { name: folder_name(&path), path, covers, folders, tracks })
 }
 
-pub fn collection(conn: &Connection, kind: &str, id: &str) -> Result<Collection> {
+pub fn collection(conn: &Connection, kind: &str, id: &str, random: &[i64]) -> Result<Collection> {
     let (title, subtitle, tracks) = match kind {
+        "playlist" => {
+            let name = SMART.iter().find(|(k, _)| *k == id).map(|(_, n)| n.to_string()).unwrap_or_default();
+            (name, "Playlist".to_string(), smart_tracks(conn, id, random)?)
+        }
         "album" => {
             let (artist, album) = id.split_once('\u{1f}').unwrap_or(("", id));
             let t = tracks_where(conn, "WHERE t.album = ?1 AND t.album_artist = ?2 ORDER BY t.disc_no, t.track_no, t.path", [album, artist])?;
@@ -247,7 +313,7 @@ pub fn root_tiles(conn: &Connection, roots: &[String]) -> Result<Vec<Tile>> {
     roots
         .iter()
         .map(|r| {
-            let c = collection(conn, "folder", r)?;
+            let c = collection(conn, "folder", r, &[])?;
             Ok(Tile { kind: "folder", id: norm_dir(r), name: c.title, subtitle: c.subtitle, count: c.tracks.len(), covers: c.covers })
         })
         .collect()
