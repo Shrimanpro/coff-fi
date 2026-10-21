@@ -1,4 +1,5 @@
 use std::collections::HashSet;
+use std::time::Duration;
 
 use anyhow::{anyhow, Result};
 use reqwest::blocking::Client;
@@ -11,6 +12,8 @@ use super::{parse, Lyrics, Query, Synced};
 
 const API: &str = "https://lrclib.net/api";
 const SOURCE: &str = "LRCLIB";
+/// LRCLIB often answers 503 (overloaded) or 429 (rate limited); a short retry usually succeeds.
+const ATTEMPTS: u32 = 4;
 
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -45,13 +48,24 @@ fn plain(r: &Rec) -> Option<Lyrics> {
     r.instrumental.then(|| Lyrics { source: SOURCE.into(), synced: Synced::None, lines: Vec::new() })
 }
 
-/// GET a JSON endpoint. `Ok(None)` means 404.
+/// GET with retries on overload, rate limits and network errors. `Ok(None)` means 404.
 fn get<T: DeserializeOwned>(client: &Client, path: &str, params: &[(&str, &str)]) -> Result<Option<T>> {
-    match client.get(format!("{API}/{path}")).query(params).send()? {
-        res if res.status() == StatusCode::NOT_FOUND => Ok(None),
-        res if res.status().is_success() => Ok(Some(res.json()?)),
-        res => Err(anyhow!("LRCLIB answered {}", res.status())),
+    let mut last = anyhow!("no attempt");
+    for attempt in 0..ATTEMPTS {
+        if attempt > 0 {
+            std::thread::sleep(Duration::from_millis(350 * 2u64.pow(attempt - 1)));
+        }
+        match client.get(format!("{API}/{path}")).query(params).send() {
+            Ok(res) if res.status() == StatusCode::NOT_FOUND => return Ok(None),
+            Ok(res) if res.status().is_success() => return Ok(Some(res.json()?)),
+            Ok(res) if res.status() == StatusCode::TOO_MANY_REQUESTS || res.status().is_server_error() => {
+                last = anyhow!("LRCLIB answered {}", res.status());
+            }
+            Ok(res) => return Err(anyhow!("LRCLIB answered {}", res.status())),
+            Err(e) => last = e.into(),
+        }
     }
+    Err(last)
 }
 
 /// Candidates gathered from several lookups, de-duplicated. Remembers whether every lookup failed.

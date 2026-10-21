@@ -9,6 +9,7 @@
   let loading = $state(true);
   /** Set when LRCLIB couldn't be reached (as opposed to having no lyrics). */
   let failed = $state(false);
+  let retryTimer: ReturnType<typeof setTimeout> | undefined;
   let active = $state(-1);
   let shift = $state(0);
   let manual = $state(false);
@@ -16,7 +17,8 @@
   let lineEls: HTMLElement[] = $state([]);
   let manualTimer: ReturnType<typeof setTimeout> | undefined;
 
-  async function load(id: number, refresh = false) {
+  async function load(id: number, refresh = false, attempt = 0) {
+    clearTimeout(retryTimer);
     loading = true;
     failed = false;
     lyr = null;
@@ -27,12 +29,15 @@
     } catch {
       if (id !== trackId) return;
       failed = true;
+      // LRCLIB is often briefly overloaded; try again on our own a couple of times.
+      if (attempt < 2) retryTimer = setTimeout(() => load(id, false, attempt + 1), 4000 * (attempt + 1));
     }
     if (id === trackId) loading = false;
   }
 
   $effect(() => {
     load(trackId);
+    return () => clearTimeout(retryTimer);
   });
 
   const synced = $derived(!!lyr && lyr.synced !== "none" && lyr.lines.length > 0);
