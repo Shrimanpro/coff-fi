@@ -43,6 +43,7 @@ CREATE TABLE IF NOT EXISTS queues(id INTEGER PRIMARY KEY, name TEXT NOT NULL, ki
 CREATE TABLE IF NOT EXISTS queue_items(queue_id INTEGER NOT NULL, idx INTEGER NOT NULL, track_id INTEGER NOT NULL);
 CREATE INDEX IF NOT EXISTS queue_items_q ON queue_items(queue_id);
 CREATE TABLE IF NOT EXISTS settings(k TEXT PRIMARY KEY, v TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS lyrics(track_id INTEGER PRIMARY KEY, json TEXT NOT NULL, fetched_at INTEGER NOT NULL);
 ";
 
 pub const TRACK_COLS: &str = "t.id, t.path, t.dir, t.title, t.artist, t.album, t.album_artist, t.track_no, t.year, t.duration, t.codec, t.sample_rate, t.bit_depth, t.bitrate, t.cover";

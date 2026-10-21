@@ -68,6 +68,18 @@ export interface QueueView {
   tracks: Track[];
 }
 
+export interface LyricLine {
+  start: number;
+  end: number;
+  text: string;
+}
+
+export interface Lyrics {
+  source: string;
+  synced: "none" | "line" | "word";
+  lines: LyricLine[];
+}
+
 export interface EqSettings {
   enabled: boolean;
   preamp: number;

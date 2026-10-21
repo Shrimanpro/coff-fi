@@ -1,5 +1,5 @@
 import { convertFileSrc, invoke } from "@tauri-apps/api/core";
-import type { Collection, FolderView, Home, QueueView, Repeat, SearchResults, Settings, Status, Tile } from "./types";
+import type { Collection, FolderView, Home, Lyrics, QueueView, Repeat, SearchResults, Settings, Status, Tile } from "./types";
 export const api = {
   getSettings: () => invoke<Settings>("get_settings"),
   setSettings: (settings: Settings) => invoke<void>("set_settings", { settings }),
@@ -12,6 +12,7 @@ export const api = {
   palette: (hash: string) => invoke<string[]>("get_palette", { hash }),
   toggleFavorite: (id: number) => invoke<boolean>("toggle_favorite", { id }),
   isFavorite: (id: number) => invoke<boolean>("is_favorite", { id }),
+  lyrics: (id: number, refresh = false) => invoke<Lyrics | null>("get_lyrics", { id, refresh }),
   playTracks: (ids: number[], start: number, name: string) => invoke<void>("play_tracks", { ids, start, name }),
   enqueue: (ids: number[], next: boolean) => invoke<void>("enqueue", { ids, next }),
   cmd: (cmd: string, value?: number) => invoke<void>("player_cmd", { cmd, value }),

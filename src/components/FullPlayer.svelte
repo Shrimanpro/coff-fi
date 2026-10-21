@@ -4,6 +4,7 @@
   import { anchors, player, ui } from "../lib/state.svelte";
   import Cover from "./Cover.svelte";
   import Icon from "./Icon.svelte";
+  import Lyrics from "./Lyrics.svelte";
   import Scrubber from "./Scrubber.svelte";
   import Transport from "./Transport.svelte";
 
@@ -98,6 +99,11 @@
         <div class="title ellipsis">{t.title}</div>
         <div class="artist ellipsis">{t.artist}</div>
         <div class="controls"><Transport big /></div>
+      </div>
+      <div class="right">
+        {#key t.id}
+          <Lyrics trackId={t.id} />
+        {/key}
       </div>
     </div>
   {/if}

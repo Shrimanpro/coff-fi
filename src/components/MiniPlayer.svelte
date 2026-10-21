@@ -71,6 +71,7 @@
     <div class="center"><Transport /></div>
 
     <div class="right">
+      <button class="icon-btn" title="Lyrics" onclick={() => (ui.fullscreen = true)}><Icon name="lyrics" /></button>
       <button class="icon-btn" class:on={ui.leftPinned} title="Queue" onclick={() => (ui.leftPinned = !ui.leftPinned)}><Icon name="queue" /></button>
       <div class="vol" class:open={volOpen} onwheel={wheel}>
         <input

@@ -1,5 +1,6 @@
 mod audio;
 mod library;
+mod lyrics;
 mod queue;
 mod settings;
 
@@ -235,6 +236,20 @@ fn is_favorite(st: State<AppState>, id: i64) -> Res<bool> {
     db::is_favorite(&st.db.lock(), id).map_err(err)
 }
 
+#[tauri::command]
+async fn get_lyrics(app: AppHandle, id: i64, refresh: bool) -> Res<Option<lyrics::Lyrics>> {
+    let st = app.state::<AppState>();
+    let path = st.db_path.read().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        let conn = db::open(&path)?;
+        let Some(t) = db::track(&conn, id)? else { return Ok(None) };
+        lyrics::get(&conn, &t, refresh)
+    })
+    .await
+    .map_err(err)?
+    .map_err(|e: anyhow::Error| err(e))
+}
+
 // ---------- queue & playback ----------
 
 #[derive(Serialize)]
@@ -450,6 +465,15 @@ fn on_player_event(app: &AppHandle, e: Event) {
         Event::Track(id) => {
             let track = id.and_then(|id| db::track(&st.db.lock(), id).ok().flatten());
             let _ = app.emit("player://track", &track);
+            if let Some(t) = &track {
+                // Warm the lyrics cache so the full-screen view has them immediately.
+                let (t, path) = (t.clone(), st.db_path.read().clone());
+                std::thread::spawn(move || {
+                    if let Ok(conn) = db::open(&path) {
+                        let _ = lyrics::get(&conn, &t, false);
+                    }
+                });
+            }
             let _ = app.emit("queue://changed", ());
             let q = st.player.queue.lock().clone();
             let _ = persist_current(&mut st.db.lock(), &q);
@@ -533,6 +557,7 @@ pub fn run() {
             get_palette,
             toggle_favorite,
             is_favorite,
+            get_lyrics,
             play_tracks,
             enqueue,
             player_cmd,
