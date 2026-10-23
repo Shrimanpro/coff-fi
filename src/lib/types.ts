@@ -68,10 +68,18 @@ export interface QueueView {
   tracks: Track[];
 }
 
+export interface Word {
+  start: number;
+  end: number;
+  text: string;
+}
+
 export interface LyricLine {
   start: number;
   end: number;
   text: string;
+  words: Word[];
+  background: boolean;
 }
 
 export interface Lyrics {

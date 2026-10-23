@@ -21,6 +21,14 @@ use crate::library::db::{now, Track};
 pub enum Synced {
     None,
     Line,
+    Word,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+pub struct Word {
+    pub start: f64,
+    pub end: f64,
+    pub text: String,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
@@ -28,6 +36,8 @@ pub struct Line {
     pub start: f64,
     pub end: f64,
     pub text: String,
+    pub words: Vec<Word>,
+    pub background: bool,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]

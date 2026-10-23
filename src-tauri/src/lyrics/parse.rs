@@ -1,4 +1,4 @@
-use super::{Line, Synced};
+use super::{Line, Synced, Word};
 
 /// Parses `mm:ss.xx` / `mm:ss:xx` / `mm:ss` into seconds.
 fn parse_ts(s: &str) -> Option<f64> {
@@ -18,6 +18,76 @@ fn leading_tags(mut line: &str) -> (Vec<&str>, &str) {
     (tags, line)
 }
 
+/// Splits `<ts>word <ts>word <ts>` into words. Returns the plain text and words.
+fn parse_words(text: &str, line_start: f64) -> (String, Vec<Word>) {
+    if !text.contains('<') {
+        return (text.trim().to_string(), Vec::new());
+    }
+    let mut words: Vec<Word> = Vec::new();
+    let mut plain = String::new();
+    let mut rest = text;
+    let mut cur_start: Option<f64> = None;
+    let mut cur_text = String::new();
+    let mut end_marker: Option<f64> = None;
+    loop {
+        let (before, after) = match rest.find('<') {
+            Some(i) => (&rest[..i], Some(&rest[i + 1..])),
+            None => (rest, None),
+        };
+        cur_text.push_str(before);
+        let Some(after) = after else { break };
+        let Some(close) = after.find('>') else {
+            cur_text.push('<');
+            rest = after;
+            continue;
+        };
+        let Some(ts) = parse_ts(&after[..close]) else {
+            cur_text.push('<');
+            rest = after;
+            continue;
+        };
+        if !cur_text.trim().is_empty() {
+            words.push(Word { start: cur_start.unwrap_or(line_start), end: ts, text: std::mem::take(&mut cur_text) });
+        } else if let Some(w) = words.last_mut() {
+            w.text.push_str(&std::mem::take(&mut cur_text));
+        } else {
+            cur_text.clear();
+        }
+        cur_start = Some(ts);
+        end_marker = Some(ts);
+        rest = &after[close + 1..];
+    }
+    if !cur_text.trim().is_empty() {
+        words.push(Word { start: cur_start.unwrap_or(line_start), end: f64::NAN, text: cur_text });
+        end_marker = None;
+    }
+    for w in &words {
+        plain.push_str(&w.text);
+    }
+    if let (Some(e), Some(w)) = (end_marker, words.last_mut()) {
+        w.end = e;
+    }
+    // Normalise spacing: a word owns its trailing space, never a leading one.
+    for i in 0..words.len() {
+        let lead = words[i].text.len() - words[i].text.trim_start().len();
+        if lead > 0 && i > 0 {
+            let sp = words[i].text[..lead].to_string();
+            words[i].text.drain(..lead);
+            if !words[i - 1].text.ends_with(char::is_whitespace) {
+                words[i - 1].text.push_str(&sp[..1]);
+            }
+        } else if lead > 0 {
+            words[i].text.drain(..lead);
+        }
+    }
+    (plain.split_whitespace().collect::<Vec<_>>().join(" "), words)
+}
+
+fn background(text: &str) -> Option<String> {
+    let t = text.trim();
+    (t.len() > 2 && t.starts_with('(') && t.ends_with(')') && !t[1..t.len() - 1].contains(['(', ')'])).then(|| t[1..t.len() - 1].trim().to_string())
+}
+
 /// Finalises timing: line ends from the next line, word ends that were open, background vocals.
 fn finish(mut lines: Vec<Line>) -> Vec<Line> {
     lines.sort_by(|a, b| a.start.total_cmp(&b.start));
@@ -25,7 +95,25 @@ fn finish(mut lines: Vec<Line>) -> Vec<Line> {
     for i in 0..n {
         let next = if i + 1 < n { lines[i + 1].start } else { lines[i].start + 6.0 };
         if lines[i].end.is_nan() || lines[i].end <= lines[i].start {
-            lines[i].end = next.max(lines[i].start);
+            let last_word = lines[i].words.last().map(|w| w.end).filter(|e| e.is_finite());
+            lines[i].end = last_word.unwrap_or(next).max(lines[i].start);
+        }
+        let end = lines[i].end.max(next.min(lines[i].end + 1.0));
+        if let Some(w) = lines[i].words.last_mut() {
+            if !w.end.is_finite() || w.end <= w.start {
+                w.end = end.max(w.start + 0.3);
+            }
+        }
+        if let Some(t) = background(&lines[i].text) {
+            lines[i].text = t;
+            lines[i].background = true;
+            if let Some(w) = lines[i].words.first_mut() {
+                w.text = w.text.trim_start_matches('(').to_string();
+            }
+            if let Some(w) = lines[i].words.last_mut() {
+                let t = w.text.trim_end();
+                w.text = t.strip_suffix(')').unwrap_or(t).to_string();
+            }
         }
     }
     // Drop blank lines except real instrumental breaks (rendered as a ••• pause).
@@ -54,7 +142,8 @@ pub fn lrc(src: &str) -> Option<(Synced, Vec<Line>)> {
             }
         }
         for &start in &stamps {
-            lines.push(Line { start, end: f64::NAN, text: text.trim().to_string() });
+            let (plain, words) = parse_words(text, start);
+            lines.push(Line { start, end: f64::NAN, text: plain, words, background: false });
         }
     }
     if lines.is_empty() {
@@ -63,14 +152,24 @@ pub fn lrc(src: &str) -> Option<(Synced, Vec<Line>)> {
     // A positive LRC offset means the lyrics should appear earlier.
     for l in &mut lines {
         l.start = (l.start - offset).max(0.0);
+        for w in &mut l.words {
+            w.start = (w.start - offset).max(0.0);
+            w.end -= offset;
+        }
     }
-    let synced = Synced::Line;
+    let synced = if lines.iter().any(|l| !l.words.is_empty()) { Synced::Word } else { Synced::Line };
     Some((synced, finish(lines)))
 }
 
 pub fn plain(src: &str) -> Vec<Line> {
     src.lines()
-        .map(|l| Line { start: 0.0, end: 0.0, text: l.trim().to_string() })
+        .map(|l| {
+            let (bg, text) = match background(l) {
+                Some(t) => (true, t),
+                None => (false, l.trim().to_string()),
+            };
+            Line { start: 0.0, end: 0.0, text, words: Vec::new(), background: bg }
+        })
         .collect()
 }
 
@@ -96,6 +195,27 @@ mod tests {
     }
 
     #[test]
+    fn enhanced_lrc_words() {
+        let (s, l) = lrc("[00:01.00]<00:01.00>I <00:01.50>wake <00:02.00>up<00:02.80>\n[00:04.00]next").unwrap();
+        assert_eq!(s, Synced::Word);
+        let w = &l[0].words;
+        assert_eq!(w.len(), 3);
+        assert_eq!(l[0].text, "I wake up");
+        assert_eq!((w[0].start, w[0].end), (1.0, 1.5));
+        assert_eq!((w[2].start, w[2].end), (2.0, 2.8));
+        assert_eq!(w[0].text, "I ");
+        assert_eq!(w[2].text, "up");
+    }
+
+    #[test]
+    fn background_vocals() {
+        let (_, l) = lrc("[00:01.00]Lead line\n[00:02.00](Ah-ah)\n[00:03.00]Next").unwrap();
+        assert!(l[1].background);
+        assert_eq!(l[1].text, "Ah-ah");
+        assert!(!l[0].background);
+    }
+
+    #[test]
     fn instrumental_gaps() {
         let (_, l) = lrc("[00:01.00]A\n[00:02.00]\n[00:20.00]B\n[00:21.00]\n[00:21.50]C").unwrap();
         let texts: Vec<&str> = l.iter().map(|x| x.text.as_str()).collect();
@@ -105,5 +225,6 @@ mod tests {
     #[test]
     fn plain_text_is_not_lrc() {
         assert!(lrc("just words\nmore words").is_none());
+        assert_eq!(plain("a\n(b)")[1].text, "b");
     }
 }

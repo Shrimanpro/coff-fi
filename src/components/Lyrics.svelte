@@ -42,6 +42,29 @@
 
   const synced = $derived(!!lyr && lyr.synced !== "none" && lyr.lines.length > 0);
 
+  /** Held notes: words sung noticeably long swell and glow; simple scripts also ripple letter by letter. */
+  const LONG_MIN = 0.9;
+  const graphemes = new Intl.Segmenter(undefined, { granularity: "grapheme" });
+  // Splitting complex scripts (Tamil, Devanagari, Arabic…) into boxes would break their shaping.
+  const SIMPLE = /^[\p{Script=Latin}\p{Script=Greek}\p{Script=Cyrillic}\p{M}\p{P}\p{N}'’]+$/u;
+  type Held = { letters: string[] | null } | null;
+  const held = $derived<Held[][]>(
+    lyr?.lines.map((l) =>
+      l.words.map((w) => {
+        const core = w.text.trim();
+        const letters = Array.from(graphemes.segment(core), (g) => g.segment);
+        if (!letters.length || letters.length > 14 || w.end - w.start < Math.max(LONG_MIN, letters.length * 0.13)) return null;
+        return { letters: SIMPLE.test(core) ? letters : null };
+      }),
+    ) ?? [],
+  );
+  const split = (text: string) => {
+    const core = text.trimEnd();
+    return { core, tail: text.slice(core.length) };
+  };
+  const clamp01 = (x: number) => (x < 0 ? 0 : x > 1 ? 1 : x);
+  const easeOut = (x: number) => 1 - (1 - x) * (1 - x);
+
   /** Index of the last line that has started (binary search). */
   function find(t: number): number {
     const lines = lyr!.lines;
@@ -64,10 +87,37 @@
     const playing = player.status.playing;
     player.status.position;
     let raf = 0;
+    let words: { el: HTMLElement; chars: HTMLElement[] }[] = [];
+    let wordsFor = -1;
     const tick = () => {
       const t = position() + 0.12; // tiny lead feels more in sync with the voice
       const i = find(t);
       if (i !== active) active = i;
+      if (lyr && i >= 0 && lyr.lines[i].words.length) {
+        if (wordsFor !== i) {
+          const els = lineEls[i]?.querySelectorAll<HTMLElement>(".w") ?? [];
+          words = Array.from(els, (el) => ({ el, chars: Array.from(el.querySelectorAll<HTMLElement>(".c")) }));
+          wordsFor = i;
+        }
+        const ws = lyr.lines[i].words;
+        words.forEach(({ el, chars }, k) => {
+          const w = ws[k];
+          const p = w ? clamp01((t - w.start) / Math.max(0.05, w.end - w.start)) : 1;
+          el.style.setProperty("--p", p.toFixed(3));
+          // Words rise as they are sung and stay up until the line ends.
+          el.style.setProperty("--lift", easeOut(clamp01(p * 1.6)).toFixed(3));
+          if (chars.length) {
+            // Swell peaks in the middle of the held note; letters ripple in sequence.
+            el.style.setProperty("--g", (p > 0 && p < 1 ? Math.sin(Math.PI * p) : 0).toFixed(3));
+            const n = chars.length;
+            chars.forEach((c, j) => {
+              const cp = clamp01(p * n - j);
+              c.style.setProperty("--p", cp.toFixed(3));
+              c.style.setProperty("--wave", (p < 1 ? Math.sin(Math.PI * cp) : 0).toFixed(3));
+            });
+          }
+        });
+      }
       if (playing) raf = requestAnimationFrame(tick);
     };
     tick();
@@ -126,9 +176,11 @@
       {#each lyr.lines as line, i (i)}
         <div
           class="line"
+          class:bg={line.background}
           class:active={synced && i === active}
           class:past={synced && i < active}
           class:gap={!line.text}
+          class:words={line.words.length > 0}
           style={synced ? style(i) : ""}
           bind:this={lineEls[i]}
           role="button"
@@ -138,6 +190,8 @@
         >
           {#if !line.text}
             <span class="dots" class:run={i === active}><i></i><i></i><i></i></span>
+          {:else if line.words.length && synced}
+            {#each line.words as w, k (k)}{@const { core, tail } = split(w.text)}{@const h = held[i]?.[k]}{#if h?.letters}<span class="w held split">{#each h.letters as ch, j (j)}<span class="c">{ch}</span>{/each}</span>{:else if h}<span class="w held">{core}</span>{:else}<span class="w">{core}</span>{/if}{tail}{/each}
           {:else}
             {line.text}
           {/if}
