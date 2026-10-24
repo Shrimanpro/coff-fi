@@ -16,6 +16,26 @@ export interface Track {
   cover: string | null;
 }
 
+/** Editable tags of a local file (song info panel). */
+export interface Tags {
+  title: string;
+  artist: string;
+  album: string;
+  album_artist: string;
+  genre: string;
+  track_no: number | null;
+  track_total: number | null;
+  disc_no: number | null;
+  disc_total: number | null;
+  year: number | null;
+}
+
+export interface FileInfo {
+  tags: Tags;
+  size: number;
+  read_only: boolean;
+}
+
 export type TileKind = "playlist" | "album" | "artist" | "folder";
 
 export interface Tile {

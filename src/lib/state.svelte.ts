@@ -13,6 +13,8 @@ export const ui = $state({
   collection: null as { kind: TileKind; id: string } | null,
   fullscreen: false,
   settingsOpen: false,
+  /** Local song whose info/tag editor is open. */
+  info: null as Track | null,
   /** The centred search palette (Cmd/Ctrl+K). */
   palette: false,
   /** A song to scroll to and highlight once its album opens ("go to track"). */

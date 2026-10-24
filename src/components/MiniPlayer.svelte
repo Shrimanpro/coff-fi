@@ -28,6 +28,7 @@
       { label: "Go to artist", action: () => (ui.collection = { kind: "artist", id: tr.artist }) },
       { label: "Open folder", action: () => ((ui.collection = null), (ui.base = "directory"), (ui.dirPath = tr.dir)) },
       { label: "Play again next", action: () => enqueueTracks([tr], true) },
+      { label: "View / edit info", action: () => (ui.info = tr) },
       { label: "Show file", action: () => revealItemInDir(tr.path).catch((x) => toast(String(x))) },
     ]);
   }

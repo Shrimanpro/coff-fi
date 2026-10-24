@@ -7,6 +7,7 @@
   import MiniPlayer from "./components/MiniPlayer.svelte";
   import QueueSidebar from "./components/QueueSidebar.svelte";
   import Settings from "./components/settings/Settings.svelte";
+  import TrackInfo from "./components/TrackInfo.svelte";
   import Toast from "./components/Toast.svelte";
   import TopBar from "./components/TopBar.svelte";
   import TreeSidebar from "./components/TreeSidebar.svelte";
@@ -47,7 +48,7 @@
   }
 
   function onMove(e: MouseEvent) {
-    if (ui.fullscreen || ui.settingsOpen) return;
+    if (ui.fullscreen || ui.settingsOpen || ui.info) return;
     if (e.clientX <= EDGE && e.clientY > 60) reveal("left");
     else if (e.clientX >= innerWidth - EDGE && e.clientY > 60) reveal("right");
   }
@@ -67,7 +68,7 @@
     if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
     const mod = e.ctrlKey || e.metaKey;
     // Back: Cmd+[ on macOS, Alt+Left elsewhere (the usual browser shortcuts).
-    if (!ui.fullscreen && !ui.settingsOpen && ((e.metaKey && e.key === "[") || (e.altKey && e.key === "ArrowLeft"))) {
+    if (!ui.fullscreen && !ui.settingsOpen && !ui.info && ((e.metaKey && e.key === "[") || (e.altKey && e.key === "ArrowLeft"))) {
       e.preventDefault();
       goBack();
       return;
@@ -80,6 +81,7 @@
     else if (ui.fullscreen && e.key === "ArrowRight") api.cmd("seek", position() + 5);
     else if (ui.fullscreen && e.key === "ArrowLeft") api.cmd("seek", Math.max(0, position() - 5));
     else if (mod && e.key === ",") ui.settingsOpen = true;
+    else if (e.key === "Escape" && !ui.fullscreen && !ui.settingsOpen && !ui.info && !ui.menu && ui.collection) ui.collection = null;
   }
 
   // Start each page at the top.
@@ -126,6 +128,10 @@
 
 {#if ui.settingsOpen}
   <Settings />
+{/if}
+
+{#if ui.info}
+  <TrackInfo />
 {/if}
 
 <BackSwipe />

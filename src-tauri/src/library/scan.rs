@@ -143,6 +143,18 @@ fn read_file(path: &Path, mtime: i64) -> Scanned {
     s
 }
 
+/// Re-reads one file's tags into its existing row after the info panel edits it,
+/// recording the new mtime so the next scan doesn't redo the work.
+pub fn refresh_file(conn: &Connection, path: &str) -> Result<()> {
+    let p = Path::new(path);
+    let s = read_file(p, mtime(p));
+    conn.execute(
+        "UPDATE tracks SET mtime = ?2, title = ?3, artist = ?4, album = ?5, album_artist = ?6, track_no = ?7, disc_no = ?8, year = ?9 WHERE path = ?1",
+        params![path, s.mtime, s.title, s.artist, s.album, s.album_artist, s.track_no, s.disc_no, s.year],
+    )?;
+    Ok(())
+}
+
 #[derive(Default, Debug, serde::Serialize)]
 pub struct ScanStats {
     pub total: usize,

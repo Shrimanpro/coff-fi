@@ -34,7 +34,7 @@
   }
 
   function onWheel(e: WheelEvent) {
-    if (ui.fullscreen || ui.settingsOpen || ui.palette || ui.menu || e.ctrlKey) return;
+    if (ui.fullscreen || ui.settingsOpen || ui.info || ui.palette || ui.menu || e.ctrlKey) return;
     if (e.timeStamp - last > GAP) end();
     last = e.timeStamp;
     clearTimeout(endTimer);

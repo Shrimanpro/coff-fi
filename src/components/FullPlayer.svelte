@@ -62,7 +62,7 @@
   }
 
   function onKey(e: KeyboardEvent) {
-    if (e.key === "Escape" && !ui.menu && !ui.settingsOpen) {
+    if (e.key === "Escape" && !ui.menu && !ui.settingsOpen && !ui.info) {
       e.preventDefault();
       close();
     }

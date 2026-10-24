@@ -205,6 +205,33 @@ async fn get_collection(st: State<'_, AppState>, kind: String, id: String) -> Re
     library::collection(&st.db.lock(), &kind, &id, &random).map_err(err)
 }
 
+// ---------- song info ----------
+
+/// Path of a local library song; Navidrome songs aren't files we can edit.
+fn local_file(st: &AppState, id: i64) -> Res<String> {
+    Ok(db::track(&st.db.lock(), id).map_err(err)?.ok_or("Song not found")?.path)
+}
+
+#[tauri::command]
+async fn get_tags(st: State<'_, AppState>, id: i64) -> Res<library::tags::FileInfo> {
+    let path = local_file(&st, id)?;
+    library::tags::read(Path::new(&path)).map_err(|e| format!("{e:#}"))
+}
+
+#[tauri::command]
+async fn set_tags(app: AppHandle, id: i64, tags: library::tags::Tags) -> Res<db::Track> {
+    let st = app.state::<AppState>();
+    let path = local_file(&st, id)?;
+    library::tags::write(Path::new(&path), &tags).map_err(|e| format!("{e:#}"))?;
+    let track = {
+        let conn = st.db.lock();
+        scan::refresh_file(&conn, &path).map_err(err)?;
+        db::track(&conn, id).map_err(err)?.ok_or("Song not found")?
+    };
+    let _ = app.emit("library://changed", ());
+    Ok(track)
+}
+
 #[tauri::command]
 async fn search(st: State<'_, AppState>, query: String) -> Res<SearchResults> {
     library::search(&st.db.lock(), &query).map_err(err)
@@ -565,6 +592,8 @@ pub fn run() {
             get_queue,
             queue_edit,
             search,
+            get_tags,
+            set_tags,
             set_play_mode,
         ])
         .run(tauri::generate_context!())
