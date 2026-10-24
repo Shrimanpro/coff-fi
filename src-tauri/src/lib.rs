@@ -1,4 +1,5 @@
 mod audio;
+mod integrations;
 mod library;
 mod lyrics;
 mod queue;
@@ -15,6 +16,7 @@ use tauri::http::{Request, Response, StatusCode};
 use tauri::{AppHandle, Emitter, Manager, State};
 
 use audio::{Cmd, Event, PlaybackCfg, Player, Status};
+use integrations::{Control, Integrations, Msg, NowPlaying};
 use library::{covers, db, scan, Collection, FolderView, Home, SearchResults, Tile};
 use queue::Queue;
 use settings::{Repeat, Settings};
@@ -34,6 +36,7 @@ pub struct AppState {
     cfg_db: Mutex<Connection>,
     settings: RwLock<Settings>,
     player: Player,
+    integrations: Integrations,
     random: RwLock<Vec<i64>>,
     watcher: Mutex<Option<Watcher>>,
     scanning: AtomicBool,
@@ -79,6 +82,7 @@ fn set_settings(app: AppHandle, st: State<AppState>, settings: Settings) -> Res<
         start_watcher(&app, &st);
         rescan_now(&app);
     }
+    st.integrations.send(Msg::Config(Box::new(s)));
     Ok(())
 }
 
@@ -487,6 +491,7 @@ fn on_player_event(app: &AppHandle, e: Event) {
     let st = app.state::<AppState>();
     match e {
         Event::State(s) => {
+            st.integrations.send(Msg::Playback { playing: s.playing, position: s.position });
                 let _ = app.emit("player://state", s);
         }
         Event::Track(id) => {
@@ -504,6 +509,19 @@ fn on_player_event(app: &AppHandle, e: Event) {
             let _ = app.emit("queue://changed", ());
             let q = st.player.queue.lock().clone();
             let _ = persist_current(&mut st.db.lock(), &q);
+            let integ = st.integrations.clone();
+            match track {
+                Some(t) => {
+                    // Generating the cover thumbnail may take a moment; keep it off the player thread.
+                    std::thread::spawn(move || {
+                        let cover = t.cover.as_ref().and_then(|h| {
+                            PROTO_CONN.with(|c| with_proto_conn(c, |conn, thumbs| covers::thumb(conn, thumbs, h, 640))).ok()
+                        });
+                        integ.send(Msg::Track(Some(NowPlaying { title: t.title, artist: t.artist, album: t.album, duration: t.duration, cover })));
+                    });
+                }
+                None => integ.send(Msg::Track(None)),
+            }
         }
         Event::Played(id) => {
             {
@@ -516,6 +534,21 @@ fn on_player_event(app: &AppHandle, e: Event) {
             let _ = app.emit("app://error", msg);
         }
     }
+}
+
+fn on_control(app: &AppHandle, c: Control) {
+    let st = app.state::<AppState>();
+    let pos = st.player.status.read().position;
+    st.player.send(match c {
+        Control::Play => Cmd::SetPlaying(true),
+        Control::Pause => Cmd::SetPlaying(false),
+        Control::Toggle => Cmd::Toggle,
+        Control::Next => Cmd::Next,
+        Control::Prev => Cmd::Prev,
+        Control::Stop => Cmd::Stop,
+        Control::SeekTo(s) => Cmd::Seek(s),
+        Control::SeekBy(d) => Cmd::Seek(pos + d),
+    });
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -555,6 +588,12 @@ pub fn run() {
             let h = app.handle().clone();
             let player = Player::spawn(db_path.clone(), &s, q, move |e| on_player_event(&h, e));
 
+            #[cfg(windows)]
+            let hwnd = app.get_webview_window("main").and_then(|w| w.hwnd().ok()).map(|h| h.0 as isize);
+            #[cfg(not(windows))]
+            let hwnd: Option<isize> = None;
+            let h = app.handle().clone();
+            let integ = integrations::spawn(s.clone(), hwnd, move |c| on_control(&h, c));
 
             app.manage(AppState {
                 db: Mutex::new(conn),
@@ -562,6 +601,7 @@ pub fn run() {
                 cfg_db: Mutex::new(cfg_conn),
                 settings: RwLock::new(s),
                 player,
+                integrations: integ,
                 random: RwLock::new(random),
                 watcher: Mutex::new(None),
                 scanning: AtomicBool::new(false),

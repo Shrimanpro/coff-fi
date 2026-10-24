@@ -60,6 +60,7 @@ pub struct Settings {
     pub rg_preamp: f32,
     pub shuffle: bool,
     pub repeat: Repeat,
+    pub media_controls: bool,
 }
 
 impl Default for Settings {
@@ -77,6 +78,7 @@ impl Default for Settings {
             rg_preamp: 0.0,
             shuffle: false,
             repeat: Repeat::Off,
+            media_controls: true,
         }
     }
 }

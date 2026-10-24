@@ -124,7 +124,7 @@
 <div class="dialog glass" transition:scale={{ start: 0.96, duration: 260 }} role="dialog" aria-label="Settings">
   <nav>
     <h2>Settings</h2>
-    {#each [["eq", "Equalizer"], ["library", "Library"], ["playback", "Playback"]] as [id, label] (id)}
+    {#each [["eq", "Equalizer"], ["library", "Library"], ["playback", "Playback"], ["integrations", "Integrations"]] as [id, label] (id)}
       <button class:on={tab === id} onclick={() => (tab = id as Tab)}>{label}</button>
     {/each}
     {#if version}<span class="version">Coff-fi {version}</span>{/if}
@@ -226,6 +226,11 @@
           <span class="v">{s.rg_preamp > 0 ? "+" : ""}{s.rg_preamp} dB</span>
         </div>
         <p class="help">Uses ReplayGain tags in your files.</p>
+
+      {:else if tab === "integrations"}
+        <h3>System media controls</h3>
+        <label class="switch"><input type="checkbox" bind:checked={s.media_controls} onchange={() => saveSettings(0)} /><span></span> Media keys & now-playing widget</label>
+
 
       {/if}
     {/if}

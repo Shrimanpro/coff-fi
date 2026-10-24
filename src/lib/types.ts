@@ -134,6 +134,7 @@ export interface Settings {
   rg_preamp: number;
   shuffle: boolean;
   repeat: Repeat;
+  media_controls: boolean;
 }
 
 export interface SearchResults {
