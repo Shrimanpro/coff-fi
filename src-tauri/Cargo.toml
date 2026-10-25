@@ -35,6 +35,7 @@ urlencoding = "2"
 notify = "6"
 notify-debouncer-mini = "0.4"
 souvlaki = "0.8"
+discord-rich-presence = "1.1"
 
 [profile.release]
 opt-level = 3

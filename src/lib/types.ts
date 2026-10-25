@@ -135,6 +135,7 @@ export interface Settings {
   shuffle: boolean;
   repeat: Repeat;
   media_controls: boolean;
+  discord: { enabled: boolean };
 }
 
 export interface SearchResults {

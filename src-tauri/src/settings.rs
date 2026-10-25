@@ -45,6 +45,12 @@ pub enum Repeat {
     One,
 }
 
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Default)]
+#[serde(default)]
+pub struct Discord {
+    pub enabled: bool,
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 #[serde(default)]
 pub struct Settings {
@@ -61,6 +67,7 @@ pub struct Settings {
     pub shuffle: bool,
     pub repeat: Repeat,
     pub media_controls: bool,
+    pub discord: Discord,
 }
 
 impl Default for Settings {
@@ -79,6 +86,7 @@ impl Default for Settings {
             shuffle: false,
             repeat: Repeat::Off,
             media_controls: true,
+            discord: Discord::default(),
         }
     }
 }

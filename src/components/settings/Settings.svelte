@@ -231,6 +231,9 @@
         <h3>System media controls</h3>
         <label class="switch"><input type="checkbox" bind:checked={s.media_controls} onchange={() => saveSettings(0)} /><span></span> Media keys & now-playing widget</label>
 
+        <h3>Discord Rich Presence</h3>
+        <label class="switch"><input type="checkbox" bind:checked={s.discord.enabled} onchange={() => saveSettings(0)} /><span></span> Show what I'm listening to</label>
+        <p class="help">Shows the song you're playing on your Discord profile while the Discord app is open.</p>
 
       {/if}
     {/if}
