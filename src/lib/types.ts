@@ -136,6 +136,7 @@ export interface Settings {
   repeat: Repeat;
   media_controls: boolean;
   discord: { enabled: boolean };
+  lastfm: { enabled: boolean; api_key: string; api_secret: string; username: string; session_key: string };
 }
 
 export interface SearchResults {

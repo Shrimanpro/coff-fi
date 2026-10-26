@@ -4,6 +4,7 @@ export const api = {
   getSettings: () => invoke<Settings>("get_settings"),
   setSettings: (settings: Settings) => invoke<void>("set_settings", { settings }),
   setVolume: (volume: number) => invoke<void>("set_volume", { volume }),
+  lastfmLogin: (username: string, password: string) => invoke<void>("lastfm_login", { username, password }),
   rescan: () => invoke<void>("rescan"),
   home: () => invoke<Home>("get_home"),
   roots: () => invoke<Tile[]>("get_roots"),

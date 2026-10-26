@@ -1,4 +1,7 @@
-//! OS media controls (MPRIS / SMTC / Now Playing), driven from a background thread.
+//! OS media controls (MPRIS / SMTC / Now Playing), Discord Rich Presence and Last.fm,
+//! all driven from one background thread so network or IPC hiccups never touch playback.
+
+pub mod lastfm;
 
 use std::collections::HashMap;
 use std::path::PathBuf;
@@ -11,6 +14,7 @@ use discord_rich_presence::{DiscordIpc, DiscordIpcClient};
 use serde_json::Value;
 use souvlaki::{MediaControlEvent, MediaControls, MediaMetadata, MediaPlayback, MediaPosition, PlatformConfig, SeekDirection};
 
+use crate::library::db::now;
 use crate::settings::Settings;
 
 /// Coff-fi's own Discord application, so users only need to flip the toggle.
@@ -28,6 +32,7 @@ pub struct NowPlaying {
 pub enum Msg {
     Track(Option<NowPlaying>),
     Playback { playing: bool, position: f64 },
+    Played,
     Config(Box<Settings>),
     /// Result of a background cover-art lookup for Discord (keyed by `art_key`).
     Art(String, Option<String>),
@@ -88,6 +93,7 @@ pub fn spawn(settings: Settings, hwnd: Option<isize>, on_control: impl Fn(Contro
             let mut controls: Option<MediaControls> = None;
             let mut discord: Option<DiscordIpcClient> = None;
             let mut track: Option<NowPlaying> = None;
+            let mut started = now();
             let mut playing = false;
             let mut position = 0.0;
             let mut art: HashMap<String, Option<String>> = HashMap::new();
@@ -135,11 +141,13 @@ pub fn spawn(settings: Settings, hwnd: Option<isize>, on_control: impl Fn(Contro
             };
             discord = connect_discord(&cfg).or(discord);
 
+            let lastfm_on = |cfg: &Settings| cfg.lastfm.enabled && !cfg.lastfm.session_key.is_empty();
 
             while let Ok(msg) = rx.recv() {
                 match msg {
                     Msg::Track(np) => {
                         track = np;
+                        started = now();
                         if let Some(c) = &mut controls {
                             match &track {
                                 Some(t) => {
@@ -154,6 +162,14 @@ pub fn spawn(settings: Settings, hwnd: Option<isize>, on_control: impl Fn(Contro
                                 }
                                 None => {
                                     let _ = c.set_playback(MediaPlayback::Stopped);
+                                }
+                            }
+                        }
+                        if let Some(t) = &track {
+                            if lastfm_on(&cfg) {
+                                let s = lastfm::Scrobble { artist: &t.artist, title: &t.title, album: &t.album, duration: t.duration };
+                                if let Err(e) = lastfm::now_playing(&cfg.lastfm, &s) {
+                                    eprintln!("{e:#}");
                                 }
                             }
                         }
@@ -174,6 +190,14 @@ pub fn spawn(settings: Settings, hwnd: Option<isize>, on_control: impl Fn(Contro
                             } else {
                                 MediaPlayback::Paused { progress }
                             });
+                        }
+                    }
+                    Msg::Played => {
+                        if let (Some(t), true) = (&track, lastfm_on(&cfg)) {
+                            let s = lastfm::Scrobble { artist: &t.artist, title: &t.title, album: &t.album, duration: t.duration };
+                            if let Err(e) = lastfm::scrobble(&cfg.lastfm, &s, started) {
+                                eprintln!("{e:#}");
+                            }
                         }
                     }
                     Msg::Config(s) => {

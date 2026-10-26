@@ -51,6 +51,16 @@ pub struct Discord {
     pub enabled: bool,
 }
 
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Default)]
+#[serde(default)]
+pub struct LastFm {
+    pub enabled: bool,
+    pub api_key: String,
+    pub api_secret: String,
+    pub username: String,
+    pub session_key: String,
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 #[serde(default)]
 pub struct Settings {
@@ -68,6 +78,7 @@ pub struct Settings {
     pub repeat: Repeat,
     pub media_controls: bool,
     pub discord: Discord,
+    pub lastfm: LastFm,
 }
 
 impl Default for Settings {
@@ -87,6 +98,7 @@ impl Default for Settings {
             repeat: Repeat::Off,
             media_controls: true,
             discord: Discord::default(),
+            lastfm: LastFm::default(),
         }
     }
 }

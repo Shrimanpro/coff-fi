@@ -9,6 +9,9 @@
 
   type Tab = "eq" | "library" | "playback" | "integrations" | "navidrome" | "devices";
   let tab = $state<Tab>("eq");
+  let lfUser = $state("");
+  let lfPass = $state("");
+  let lfBusy = $state(false);
   let version = $state("");
   // "0.8.0" → "v0.8"; a patch number only shows when it isn't zero.
   getVersion().then((v) => (version = `v${v.replace(/\.0$/, "")}`));
@@ -111,6 +114,19 @@
   function removeFolder(list: "roots" | "excluded", dir: string) {
     s[list] = s[list].filter((d) => d !== dir);
     saveSettings(0);
+  }
+
+  async function lastfmLogin() {
+    lfBusy = true;
+    try {
+      await api.lastfmLogin(lfUser, lfPass);
+      conf.s = await api.getSettings();
+      lfPass = "";
+      toast("Connected to Last.fm");
+    } catch (e) {
+      toast(String(e));
+    }
+    lfBusy = false;
   }
 
   function close() {
@@ -235,6 +251,19 @@
         <label class="switch"><input type="checkbox" bind:checked={s.discord.enabled} onchange={() => saveSettings(0)} /><span></span> Show what I'm listening to</label>
         <p class="help">Shows the song you're playing on your Discord profile while the Discord app is open.</p>
 
+        <h3>Last.fm scrobbling</h3>
+        <label class="switch"><input type="checkbox" bind:checked={s.lastfm.enabled} onchange={() => saveSettings(0)} /><span></span> Scrobble plays</label>
+        <div class="grid2">
+          <input class="text" placeholder="API key" bind:value={s.lastfm.api_key} onchange={() => saveSettings(0)} />
+          <input class="text" placeholder="API secret" type="password" bind:value={s.lastfm.api_secret} onchange={() => saveSettings(0)} />
+          <input class="text" placeholder="Username" bind:value={lfUser} />
+          <input class="text" placeholder="Password" type="password" bind:value={lfPass} />
+        </div>
+        <div class="line">
+          <button class="pill-btn" disabled={lfBusy || !lfUser || !lfPass || !s.lastfm.api_key} onclick={lastfmLogin}>{lfBusy ? "Connecting…" : "Connect"}</button>
+          {#if s.lastfm.session_key}<span class="ok">Connected as {s.lastfm.username}</span>{/if}
+        </div>
+        <p class="help">Get an API key at last.fm/api/account/create. Your password is only used once to get a session.</p>
       {/if}
     {/if}
   </section>

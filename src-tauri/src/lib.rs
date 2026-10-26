@@ -114,6 +114,30 @@ fn set_volume(st: State<AppState>, volume: f32) -> Res<()> {
     save_settings(&st.cfg_db.lock(), &s)
 }
 
+#[tauri::command]
+async fn lastfm_login(app: AppHandle, username: String, password: String) -> Res<()> {
+    let st = app.state::<AppState>();
+    let (key, secret) = {
+        let s = st.settings.read();
+        (s.lastfm.api_key.clone(), s.lastfm.api_secret.clone())
+    };
+    let user = username.clone();
+    let sk = tauri::async_runtime::spawn_blocking(move || integrations::lastfm::login(&key, &secret, &user, &password))
+        .await
+        .map_err(err)?
+        .map_err(err)?;
+    let s = {
+        let mut s = st.settings.write();
+        s.lastfm.session_key = sk;
+        s.lastfm.username = username;
+        s.lastfm.enabled = true;
+        s.clone()
+    };
+    save_settings(&st.cfg_db.lock(), &s)?;
+    st.integrations.send(Msg::Config(Box::new(s)));
+    Ok(())
+}
+
 fn load_current_queue(conn: &Connection, s: &Settings) -> Queue {
     let mut q = Queue::default();
     q.shuffle = s.shuffle;
@@ -528,6 +552,7 @@ fn on_player_event(app: &AppHandle, e: Event) {
                 let conn = st.db.lock();
                 let _ = db::record_play(&conn, id);
             }
+            st.integrations.send(Msg::Played);
             let _ = app.emit("stats://changed", ());
         }
         Event::Error(msg) => {
@@ -616,6 +641,7 @@ pub fn run() {
             get_settings,
             set_settings,
             set_volume,
+            lastfm_login,
             rescan,
             get_home,
             get_roots,
