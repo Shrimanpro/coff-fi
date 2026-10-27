@@ -43,6 +43,8 @@ pub struct AppState {
     rescan_pending: AtomicBool,
 }
 
+const HISTORY_KEEP: i64 = 20;
+
 // ---------- settings ----------
 
 fn save_settings(conn: &Connection, s: &Settings) -> Res<()> {
@@ -316,6 +318,16 @@ struct QueueView {
     tracks: Vec<db::Track>,
 }
 
+#[derive(Serialize)]
+struct SavedQueue {
+    id: i64,
+    name: String,
+    kind: String,
+    count: i64,
+    updated_at: i64,
+    covers: Vec<String>,
+}
+
 fn write_queue(conn: &Connection, id: Option<i64>, kind: &str, q: &Queue) -> rusqlite::Result<i64> {
     let id = match id {
         Some(id) => {
@@ -358,10 +370,32 @@ fn queue_changed(app: &AppHandle, st: &AppState) {
     let _ = app.emit("queue://changed", ());
 }
 
+/// Moves the current queue into history before it gets replaced.
+fn archive_current(st: &AppState) {
+    let q = st.player.queue.lock().clone();
+    if q.is_empty() {
+        return;
+    }
+    let conn = st.db.lock();
+    let _ = write_queue(&conn, None, "history", &q);
+    let _ = conn.execute(
+        "DELETE FROM queues WHERE kind = 'history' AND id NOT IN (SELECT id FROM queues WHERE kind = 'history' ORDER BY updated_at DESC, id DESC LIMIT ?1)",
+        [HISTORY_KEEP],
+    );
+    let _ = conn.execute("DELETE FROM queue_items WHERE queue_id NOT IN (SELECT id FROM queues)", []);
+}
+
 #[tauri::command]
 fn play_tracks(app: AppHandle, st: State<AppState>, ids: Vec<i64>, start: usize, name: String) -> Res<()> {
     if ids.is_empty() {
         return Ok(());
+    }
+    let same = {
+        let q = st.player.queue.lock();
+        q.items == ids && q.name == name
+    };
+    if !same {
+        archive_current(&st);
     }
     let id = {
         let mut q = st.player.queue.lock();
@@ -452,6 +486,64 @@ fn queue_edit(app: AppHandle, st: State<AppState>, op: String, a: usize, b: Opti
         ("remove", None) if st.player.queue.lock().is_empty() => st.player.send(Cmd::Stop),
         _ => {}
     }
+    Ok(())
+}
+
+#[tauri::command]
+async fn list_queues(st: State<'_, AppState>) -> Res<Vec<SavedQueue>> {
+    let conn = st.db.lock();
+    let mut s = conn
+        .prepare(
+            "SELECT q.id, q.name, q.kind, q.updated_at, (SELECT COUNT(*) FROM queue_items i WHERE i.queue_id = q.id)
+             FROM queues q WHERE q.kind != 'current' ORDER BY q.kind = 'history', q.updated_at DESC, q.id DESC",
+        )
+        .map_err(err)?;
+    let rows: Vec<(i64, String, String, i64, i64)> =
+        s.query_map([], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?, r.get(4)?))).map_err(err)?.filter_map(Result::ok).collect();
+    let mut cov = conn
+        .prepare("SELECT t.cover FROM queue_items i JOIN tracks t ON t.id = i.track_id WHERE i.queue_id = ?1 ORDER BY i.idx LIMIT 64")
+        .map_err(err)?;
+    Ok(rows
+        .into_iter()
+        .map(|(id, name, kind, updated_at, count)| {
+            let c: Vec<Option<String>> = cov.query_map([id], |r| r.get(0)).map(|r| r.filter_map(Result::ok).collect()).unwrap_or_default();
+            SavedQueue { id, name, kind, count, updated_at, covers: library::first_covers(c.iter(), 4) }
+        })
+        .collect())
+}
+
+#[tauri::command]
+fn load_queue(app: AppHandle, st: State<AppState>, id: i64) -> Res<()> {
+    let (name, items, pos) = read_queue(&st.db.lock(), id).map_err(err)?;
+    archive_current(&st);
+    let cur = {
+        let mut q = st.player.queue.lock();
+        q.restore(name, items, pos);
+        q.current()
+    };
+    queue_changed(&app, &st);
+    if let Some(id) = cur {
+        st.player.send(Cmd::Load { id, start: 0.0, play: true });
+    }
+    Ok(())
+}
+
+#[tauri::command]
+fn save_queue(st: State<AppState>, name: String) -> Res<()> {
+    let mut q = st.player.queue.lock().clone();
+    if q.is_empty() {
+        return Err("The queue is empty".into());
+    }
+    q.name = name;
+    write_queue(&st.db.lock(), None, "saved", &q).map_err(err)?;
+    Ok(())
+}
+
+#[tauri::command]
+fn delete_queue(st: State<AppState>, id: i64) -> Res<()> {
+    let conn = st.db.lock();
+    conn.execute("DELETE FROM queues WHERE id = ?1 AND kind != 'current'", [id]).map_err(err)?;
+    conn.execute("DELETE FROM queue_items WHERE queue_id = ?1", [id]).map_err(err)?;
     Ok(())
 }
 
@@ -657,6 +749,10 @@ pub fn run() {
             get_status,
             get_queue,
             queue_edit,
+            list_queues,
+            load_queue,
+            save_queue,
+            delete_queue,
             search,
             get_tags,
             set_tags,

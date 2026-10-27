@@ -88,6 +88,15 @@ export interface QueueView {
   tracks: Track[];
 }
 
+export interface SavedQueue {
+  id: number;
+  name: string;
+  kind: "saved" | "history";
+  count: number;
+  updated_at: number;
+  covers: string[];
+}
+
 export interface Word {
   start: number;
   end: number;

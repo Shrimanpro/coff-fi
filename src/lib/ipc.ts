@@ -1,5 +1,5 @@
 import { convertFileSrc, invoke } from "@tauri-apps/api/core";
-import type { Collection, FileInfo, FolderView, Home, Lyrics, QueueView, Repeat, SearchResults, Settings, Status, Tags, Tile, Track } from "./types";
+import type { Collection, FileInfo, FolderView, Home, Lyrics, QueueView, Repeat, SavedQueue, SearchResults, Settings, Status, Tags, Tile, Track } from "./types";
 export const api = {
   getSettings: () => invoke<Settings>("get_settings"),
   setSettings: (settings: Settings) => invoke<void>("set_settings", { settings }),
@@ -20,6 +20,10 @@ export const api = {
   status: () => invoke<Status>("get_status"),
   queue: () => invoke<QueueView>("get_queue"),
   queueEdit: (op: "jump" | "remove" | "move", a: number, b?: number) => invoke<void>("queue_edit", { op, a, b }),
+  listQueues: () => invoke<SavedQueue[]>("list_queues"),
+  loadQueue: (id: number) => invoke<void>("load_queue", { id }),
+  saveQueue: (name: string) => invoke<void>("save_queue", { name }),
+  deleteQueue: (id: number) => invoke<void>("delete_queue", { id }),
   search: (query: string) => invoke<SearchResults>("search", { query }),
   getTags: (id: number) => invoke<FileInfo>("get_tags", { id }),
   setTags: (id: number, tags: Tags) => invoke<Track>("set_tags", { id, tags }),

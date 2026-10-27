@@ -1,15 +1,43 @@
 <script lang="ts">
   import { time } from "../lib/format";
   import { api } from "../lib/ipc";
-  import { player, queue, trackMenu, ui } from "../lib/state.svelte";
-  import type { Track } from "../lib/types";
+  import { player, queue, toast, trackMenu, ui } from "../lib/state.svelte";
+  import type { SavedQueue, Track } from "../lib/types";
   import Cover from "./Cover.svelte";
   import Icon from "./Icon.svelte";
   import VirtualList from "./VirtualList.svelte";
 
   let body = $state<HTMLDivElement | null>(null);
+  let switcher = $state(false);
+  let saving = $state(false);
+  let name = $state("");
+  let saved = $state<SavedQueue[]>([]);
   let dragFrom = $state<number | null>(null);
   let dragOver = $state<number | null>(null);
+
+  async function openSwitcher() {
+    switcher = !switcher;
+    saving = false;
+    if (switcher) saved = await api.listQueues();
+  }
+
+  async function save() {
+    const n = name.trim();
+    if (!n) return;
+    try {
+      await api.saveQueue(n);
+      toast(`Saved queue “${n}”`);
+      saving = false;
+      name = "";
+    } catch (e) {
+      toast(String(e));
+    }
+  }
+
+  async function remove(q: SavedQueue) {
+    await api.deleteQueue(q.id);
+    saved = saved.filter((x) => x.id !== q.id);
+  }
 
   function drop(to: number) {
     if (dragFrom !== null && dragFrom !== to) api.queueEdit("move", dragFrom, to);
@@ -34,11 +62,40 @@
     <span class="eyebrow">Playing from</span>
     <h3 class="ellipsis" title={queue.name}>{queue.name || "Nothing yet"}</h3>
   </div>
+  <button class="icon-btn" class:on={switcher} title="Switch queue" onclick={openSwitcher}><Icon name="history" size={17} /></button>
+  <button class="icon-btn" class:on={saving} title="Save queue" onclick={() => ((saving = !saving), (switcher = false))}><Icon name="save" size={16} /></button>
   {#if ui.leftPinned}
     <button class="icon-btn" title="Unpin" onclick={() => (ui.leftPinned = false)}><Icon name="close" size={15} /></button>
   {/if}
 </div>
 
+{#if saving}
+  <form class="save" onsubmit={(e) => (e.preventDefault(), save())}>
+    <!-- svelte-ignore a11y_autofocus -->
+    <input placeholder="Name this queue" bind:value={name} autofocus />
+    <button class="pill-btn" type="submit">Save</button>
+  </form>
+{/if}
+
+{#if switcher}
+  <div class="switcher">
+    {#if saved.length === 0}
+      <p class="hint">No saved or recent queues yet.</p>
+    {/if}
+    {#each saved as q (q.id)}
+      <div class="sq" role="button" tabindex="0" onclick={() => ((switcher = false), api.loadQueue(q.id))} onkeydown={(e) => e.key === "Enter" && api.loadQueue(q.id)}>
+        <div class="sq-art"><Cover covers={q.covers} size={96} radius={6} /></div>
+        <div class="sq-meta">
+          <div class="ellipsis">{q.name}</div>
+          <div class="sub">{q.kind === "saved" ? "Saved" : "Recent"} · {q.count} songs</div>
+        </div>
+        {#if q.kind === "saved"}
+          <button class="icon-btn" title="Delete" onclick={(e) => (e.stopPropagation(), remove(q))}><Icon name="trash" size={15} /></button>
+        {/if}
+      </div>
+    {/each}
+  </div>
+{:else}
   <div class="body" bind:this={body}>
     {#if queue.tracks.length === 0}
       <p class="hint">The queue is empty. Right-click anything and choose “Add to queue”.</p>
@@ -79,6 +136,7 @@
       {/snippet}
     </VirtualList>
   </div>
+{/if}
 
 <style>
   .head {
