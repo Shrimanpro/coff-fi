@@ -68,6 +68,9 @@ fn set_settings(app: AppHandle, st: State<AppState>, settings: Settings) -> Res<
     if s.eq != old.eq {
         st.player.send(Cmd::Eq(s.eq.clone()));
     }
+    if s.output_device != old.output_device {
+        st.player.send(Cmd::Device(s.output_device.clone()));
+    }
     let cfg = PlaybackCfg::from(&s);
     if cfg != PlaybackCfg::from(&old) {
         st.player.send(Cmd::Config(cfg));
@@ -114,6 +117,11 @@ fn set_volume(st: State<AppState>, volume: f32) -> Res<()> {
         s.clone()
     };
     save_settings(&st.cfg_db.lock(), &s)
+}
+
+#[tauri::command]
+fn list_devices() -> Vec<String> {
+    audio::output::device_names()
 }
 
 #[tauri::command]
@@ -733,6 +741,7 @@ pub fn run() {
             get_settings,
             set_settings,
             set_volume,
+            list_devices,
             lastfm_login,
             rescan,
             get_home,

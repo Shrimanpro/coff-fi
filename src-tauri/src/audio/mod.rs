@@ -27,11 +27,12 @@ pub struct PlaybackCfg {
     pub crossfade: f32,
     pub replaygain: ReplayGain,
     pub rg_preamp: f32,
+    pub speed: f32,
 }
 
 impl From<&settings::Settings> for PlaybackCfg {
     fn from(s: &settings::Settings) -> Self {
-        Self { gapless: s.gapless, crossfade: s.crossfade, replaygain: s.replaygain, rg_preamp: s.rg_preamp }
+        Self { gapless: s.gapless, crossfade: s.crossfade, replaygain: s.replaygain, rg_preamp: s.rg_preamp, speed: s.speed }
     }
 }
 
@@ -46,6 +47,7 @@ pub enum Cmd {
     Volume(f32),
     Eq(settings::Eq),
     Config(PlaybackCfg),
+    Device(Option<String>),
     QueueChanged,
 }
 
@@ -77,7 +79,7 @@ impl Player {
         let (tx, rx) = unbounded();
         let queue = Arc::new(Mutex::new(queue));
         let status = Arc::new(RwLock::new(Status::default()));
-        let init = Init { eq: s.eq.clone(), volume: s.volume, cfg: s.into() };
+        let init = Init { eq: s.eq.clone(), volume: s.volume, device: s.output_device.clone(), cfg: s.into() };
         let (q, st) = (queue.clone(), status.clone());
         std::thread::Builder::new()
             .name("player".into())
@@ -97,6 +99,7 @@ impl Player {
 struct Init {
     eq: settings::Eq,
     volume: f32,
+    device: Option<String>,
     cfg: PlaybackCfg,
 }
 
@@ -164,12 +167,12 @@ struct Src {
 }
 
 impl Src {
-    fn open(path: &Path, id: i64, start: f64, duration: f64, rate: u32, gain: f32) -> Result<(Self, f64)> {
+    fn open(path: &Path, id: i64, start: f64, duration: f64, rate: u32, speed: f32, gain: f32) -> Result<(Self, f64)> {
         let mut dec = Decoder::open(path)?;
         let actual = if start > 0.05 { dec.seek(start).unwrap_or(0.0) } else { 0.0 };
-        let ratio = rate as f64 / dec.sample_rate as f64;
+        let ratio = rate as f64 / (dec.sample_rate as f64 * speed as f64);
         let rs = if (ratio - 1.0).abs() < 1e-9 { None } else { Some(Rs::new(ratio)?) };
-        let total_frames = ((duration - actual).max(0.0) * rate as f64) as u64;
+        let total_frames = ((duration - actual).max(0.0) * rate as f64 / speed as f64) as u64;
         Ok((Self { id, dec, rs, gain, pending: Vec::new(), scratch: Vec::new(), eof: false, out_frames: 0, total_frames }, actual))
     }
 
@@ -220,6 +223,7 @@ struct Engine {
     status: Arc<RwLock<Status>>,
     emit: Box<dyn Fn(Event) + Send>,
     out: Option<Output>,
+    device: Option<String>,
     volume: f32,
     eq_cfg: settings::Eq,
     eq: Option<Equalizer>,
@@ -254,6 +258,7 @@ impl Engine {
             status,
             emit,
             out: None,
+            device: i.device,
             volume: i.volume,
             eq_cfg: i.eq,
             eq: None,
@@ -320,7 +325,7 @@ impl Engine {
         if !self.counted {
             if let Some(b) = self.bounds.front().filter(|b| b.duration > 0.0) {
                 let need = (b.duration * 0.5).min(30.0);
-                secs = secs.min((need - self.position()).max(0.0));
+                secs = secs.min((need - self.position()).max(0.0) / self.cfg.speed.max(0.1) as f64);
             }
         }
         wait_clamp(secs)
@@ -332,7 +337,7 @@ impl Engine {
 
     fn ensure_output(&mut self) -> Result<()> {
         if self.out.is_none() {
-            let o = Output::open(self.volume)?;
+            let o = Output::open(self.device.as_deref(), self.volume)?;
             self.eq = Some(Equalizer::new(&self.eq_cfg, o.rate));
             self.written = o.played();
             self.out = Some(o);
@@ -378,12 +383,26 @@ impl Engine {
                 self.eq_cfg = e;
             }
             Cmd::Config(c) => {
+                let rebuild = c.speed != self.cfg.speed;
                 let regain = c.replaygain != self.cfg.replaygain || c.rg_preamp != self.cfg.rg_preamp;
                 self.cfg = c;
                 if regain {
                     if let Some(cur) = &mut self.cur {
                         cur.gain = rg_gain(&self.conn, cur.id, &self.cfg);
                     }
+                }
+                if rebuild {
+                    self.rebuild();
+                }
+            }
+            Cmd::Device(d) => {
+                self.device = d;
+                let pos = self.position();
+                let id = self.audible();
+                let playing = self.playing;
+                self.out = None;
+                if let Some(id) = id {
+                    let _ = self.load(id, pos, playing);
                 }
             }
             Cmd::QueueChanged => {
@@ -421,7 +440,7 @@ impl Engine {
     fn open_src(&self, id: i64, start: f64) -> Result<(Src, f64, f64)> {
         let t = db::track(&self.conn, id)?.ok_or_else(|| anyhow!("track {id} is no longer in the library"))?;
         let gain = rg_gain(&self.conn, id, &self.cfg);
-        let (src, actual) = Src::open(Path::new(&t.path), id, start, t.duration, self.rate(), gain)
+        let (src, actual) = Src::open(Path::new(&t.path), id, start, t.duration, self.rate(), self.cfg.speed, gain)
             .map_err(|e| anyhow!("can't play \"{}\": {e}", t.title))?;
         Ok((src, actual, t.duration))
     }
@@ -502,7 +521,7 @@ impl Engine {
     fn position(&self) -> f64 {
         let (Some(b), Some(o)) = (self.bounds.front(), &self.out) else { return 0.0 };
         let played = o.played().saturating_sub(b.at);
-        (b.start + played as f64 / o.rate as f64).min(b.duration)
+        (b.start + played as f64 / o.rate as f64 * self.cfg.speed as f64).min(b.duration)
     }
 
     fn next_src(&mut self) -> Option<(Src, f64, f64)> {
@@ -540,7 +559,7 @@ impl Engine {
                 self.gap -= g as u64;
             } else if let Some(cur) = &mut self.cur {
                 // Start a crossfade when the current track is close to its end.
-                let xf_frames = (self.cfg.crossfade.max(0.0) as f64 * rate as f64) as u64;
+                let xf_frames = (self.cfg.crossfade.max(0.0) as f64 * rate as f64 / self.cfg.speed as f64) as u64;
                 let start_xf = self.xf.is_none() && xf_frames > 0 && cur.remaining() <= xf_frames && !cur.exhausted();
                 let remaining = cur.remaining();
                 if start_xf {

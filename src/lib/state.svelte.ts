@@ -93,7 +93,8 @@ function clearHistory() {
 export function position(): number {
   const st = player.status;
   if (!st.playing) return st.position;
-  return Math.min(st.duration, st.position + (performance.now() - player.at) / 1000);
+  const speed = conf.s?.speed ?? 1;
+  return Math.min(st.duration, st.position + ((performance.now() - player.at) / 1000) * speed);
 }
 
 let toastTimer: ReturnType<typeof setTimeout> | undefined;

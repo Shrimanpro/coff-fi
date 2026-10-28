@@ -137,10 +137,12 @@ export interface Settings {
   eq: EqSettings;
   eq_presets: EqPreset[];
   volume: number;
+  output_device: string | null;
   gapless: boolean;
   crossfade: number;
   replaygain: "off" | "track" | "album";
   rg_preamp: number;
+  speed: number;
   shuffle: boolean;
   repeat: Repeat;
   media_controls: boolean;

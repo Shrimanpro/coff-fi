@@ -26,6 +26,11 @@ pub struct Output {
     running: bool,
 }
 
+pub fn device_names() -> Vec<String> {
+    let host = cpal::default_host();
+    host.output_devices().map(|ds| ds.filter_map(|d| d.name().ok()).collect()).unwrap_or_default()
+}
+
 /// Perceptual volume curve.
 fn gain(v: f32) -> f32 {
     let v = v.clamp(0.0, 1.0);
@@ -33,9 +38,12 @@ fn gain(v: f32) -> f32 {
 }
 
 impl Output {
-    pub fn open(volume: f32) -> Result<Self> {
+    pub fn open(device: Option<&str>, volume: f32) -> Result<Self> {
         let host = cpal::default_host();
-        let dev = host.default_output_device().ok_or_else(|| anyhow!("no audio output device"))?;
+        let dev = device
+            .and_then(|n| host.output_devices().ok()?.find(|d| d.name().is_ok_and(|x| x == n)))
+            .or_else(|| host.default_output_device())
+            .ok_or_else(|| anyhow!("no audio output device"))?;
         let cfg = dev.default_output_config()?;
         let rate = cfg.sample_rate().0;
         let channels = cfg.channels() as usize;

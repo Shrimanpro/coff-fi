@@ -9,6 +9,7 @@
 
   type Tab = "eq" | "library" | "playback" | "integrations" | "navidrome" | "devices";
   let tab = $state<Tab>("eq");
+  let devices = $state<string[]>([]);
   let lfUser = $state("");
   let lfPass = $state("");
   let lfBusy = $state(false);
@@ -29,6 +30,10 @@
     Rock: [5, 3, -1, -2, -1, 2, 4, 5, 5, 5],
     Treble: [0, 0, 0, 0, 0, 1, 2, 4, 5, 6],
   };
+
+  $effect(() => {
+    if (tab === "playback") api.listDevices().then((d) => (devices = d));
+  });
 
   // The selected preset keeps its name while you tweak; `modified` tells you the
   // curve no longer matches it. Built-ins only define bands, customs add preamp.
@@ -222,6 +227,18 @@
           <button class="pill-btn" disabled={ui.scanning} onclick={() => api.rescan()}><Icon name="refresh" size={15} /> {ui.scanning ? "Scanning…" : "Rescan now"}</button>
         </div>
       {:else if tab === "playback"}
+        <h3>Output</h3>
+        <select
+          value={s.output_device ?? ""}
+          onchange={(e) => {
+            s.output_device = e.currentTarget.value || null;
+            saveSettings(0);
+          }}
+        >
+          <option value="">System default</option>
+          {#each devices as d (d)}<option value={d}>{d}</option>{/each}
+        </select>
+
         <h3>Transitions</h3>
         <label class="switch"><input type="checkbox" bind:checked={s.gapless} onchange={() => saveSettings(0)} /><span></span> Gapless playback</label>
         <div class="range">
@@ -242,6 +259,14 @@
           <span class="v">{s.rg_preamp > 0 ? "+" : ""}{s.rg_preamp} dB</span>
         </div>
         <p class="help">Uses ReplayGain tags in your files.</p>
+
+        <h3>Speed</h3>
+        <div class="range">
+          <span>Speed</span>
+          <input type="range" min="0.5" max="2" step="0.05" bind:value={s.speed} oninput={() => saveSettings(400)} />
+          <span class="v">{s.speed.toFixed(2)}×</span>
+        </div>
+        <p class="help">Vinyl-style: pitch follows speed, like a turntable.</p>
 
       {:else if tab === "integrations"}
         <h3>System media controls</h3>
