@@ -157,3 +157,9 @@ export interface SearchResults {
   playlists: Tile[];
 }
 
+export interface SleepState {
+  mode: "off" | "minutes" | "end_of_track";
+  /** Unix ms when a "minutes" timer pauses playback. */
+  until: number | null;
+}
+

@@ -7,7 +7,7 @@ mod settings;
 
 use std::cell::RefCell;
 use std::path::{Path, PathBuf};
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 
 use parking_lot::{Mutex, RwLock};
 use rusqlite::{params, Connection};
@@ -41,6 +41,17 @@ pub struct AppState {
     watcher: Mutex<Option<Watcher>>,
     scanning: AtomicBool,
     rescan_pending: AtomicBool,
+    /// Sleep timer: what's armed, and a generation counter that cancels older timers.
+    sleep: Mutex<SleepState>,
+    sleep_gen: AtomicU64,
+}
+
+#[derive(Clone, Default, Serialize)]
+struct SleepState {
+    /// "off" | "minutes" | "end_of_track"
+    mode: String,
+    /// Unix ms when a "minutes" timer fires.
+    until: Option<i64>,
 }
 
 const HISTORY_KEEP: i64 = 20;
@@ -658,6 +669,10 @@ fn on_player_event(app: &AppHandle, e: Event) {
         Event::Error(msg) => {
             let _ = app.emit("app://error", msg);
         }
+        Event::Slept => {
+            *st.sleep.lock() = SleepState { mode: "off".into(), until: None };
+            let _ = app.emit("sleep://changed", st.sleep.lock().clone());
+        }
     }
 }
 
@@ -674,6 +689,42 @@ fn on_control(app: &AppHandle, c: Control) {
         Control::SeekTo(s) => Cmd::Seek(s),
         Control::SeekBy(d) => Cmd::Seek(pos + d),
     });
+}
+
+#[tauri::command]
+fn get_sleep(st: State<AppState>) -> SleepState {
+    let s = st.sleep.lock().clone();
+    if s.mode.is_empty() { SleepState { mode: "off".into(), until: None } } else { s }
+}
+
+/// Sleep timer. `mode`: "off" | "minutes" (pause after `minutes`) | "end_of_track".
+#[tauri::command]
+fn sleep_timer(app: AppHandle, st: State<AppState>, mode: String, minutes: Option<f64>) -> Res<SleepState> {
+    let generation = st.sleep_gen.fetch_add(1, Ordering::AcqRel) + 1;
+    st.player.send(Cmd::StopAfterCurrent(mode == "end_of_track"));
+    let state = match mode.as_str() {
+        "minutes" => {
+            let mins = minutes.filter(|m| *m > 0.0).ok_or("Pick how many minutes")?;
+            let until = db::now() * 1000 + (mins * 60_000.0) as i64;
+            let app = app.clone();
+            std::thread::spawn(move || {
+                std::thread::sleep(std::time::Duration::from_secs_f64(mins * 60.0));
+                let st = app.state::<AppState>();
+                if st.sleep_gen.load(Ordering::Acquire) == generation {
+                    st.player.send(Cmd::SetPlaying(false));
+                    *st.sleep.lock() = SleepState { mode: "off".into(), until: None };
+                    let _ = app.emit("sleep://changed", st.sleep.lock().clone());
+                }
+            });
+            SleepState { mode, until: Some(until) }
+        }
+        "end_of_track" => SleepState { mode, until: None },
+        "off" => SleepState { mode, until: None },
+        _ => return Err(format!("unknown sleep mode {mode}")),
+    };
+    *st.sleep.lock() = state.clone();
+    let _ = app.emit("sleep://changed", &state);
+    Ok(state)
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -731,6 +782,8 @@ pub fn run() {
                 watcher: Mutex::new(None),
                 scanning: AtomicBool::new(false),
                 rescan_pending: AtomicBool::new(false),
+                sleep: Mutex::new(SleepState { mode: "off".into(), until: None }),
+                sleep_gen: AtomicU64::new(0),
             });
             let st = app.state::<AppState>();
             start_watcher(app.handle(), &st);
@@ -765,6 +818,8 @@ pub fn run() {
             search,
             get_tags,
             set_tags,
+            get_sleep,
+            sleep_timer,
             set_play_mode,
         ])
         .run(tauri::generate_context!())

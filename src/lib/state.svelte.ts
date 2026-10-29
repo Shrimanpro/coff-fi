@@ -1,6 +1,6 @@
 import { listen } from "@tauri-apps/api/event";
 import { api } from "./ipc";
-import type { QueueView, Settings, Status, Tile, TileKind, Track } from "./types";
+import type { QueueView, Settings, SleepState, Status, Tile, TileKind, Track } from "./types";
 
 export interface MenuItem {
   label: string;
@@ -33,6 +33,7 @@ export const player = $state({
   track: null as Track | null,
   at: performance.now(),
   fav: false,
+  sleep: { mode: "off", until: null } as SleepState,
 });
 
 export const queue = $state<QueueView>({ name: "", pos: 0, shuffle: false, repeat: "off", tracks: [] });
@@ -142,6 +143,7 @@ async function syncPlayer() {
   player.at = performance.now();
   player.track = st.track_id != null ? (queue.tracks.find((t) => t.id === st.track_id) ?? null) : null;
   refreshFav();
+  player.sleep = await api.getSleep().catch(() => player.sleep);
 }
 
 function on<T>(name: string, fn: (payload: T) => void) {
@@ -164,6 +166,7 @@ export async function init() {
     on("queue://changed", () => {
       refreshQueue();
     }),
+    on<SleepState>("sleep://changed", (p) => (player.sleep = p)),
     listen("settings://changed", async () => {
       conf.s = await api.getSettings();
     }),

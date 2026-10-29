@@ -1,5 +1,5 @@
 import { convertFileSrc, invoke } from "@tauri-apps/api/core";
-import type { Collection, FileInfo, FolderView, Home, Lyrics, QueueView, Repeat, SavedQueue, SearchResults, Settings, Status, Tags, Tile, Track } from "./types";
+import type { Collection, FileInfo, FolderView, Home, Lyrics, QueueView, Repeat, SavedQueue, SearchResults, Settings, SleepState, Status, Tags, Tile, Track } from "./types";
 export const api = {
   getSettings: () => invoke<Settings>("get_settings"),
   setSettings: (settings: Settings) => invoke<void>("set_settings", { settings }),
@@ -29,6 +29,8 @@ export const api = {
   getTags: (id: number) => invoke<FileInfo>("get_tags", { id }),
   setTags: (id: number, tags: Tags) => invoke<Track>("set_tags", { id, tags }),
   setPlayMode: (mode: { shuffle?: boolean; repeat?: Repeat }) => invoke<void>("set_play_mode", { shuffle: mode.shuffle ?? null, repeat: mode.repeat ?? null }),
+  getSleep: () => invoke<SleepState>("get_sleep"),
+  sleepTimer: (mode: SleepState["mode"], minutes?: number) => invoke<SleepState>("sleep_timer", { mode, minutes }),
 };
 /** Square cover image for a set of cover hashes (single cover or 2×2 collage). */
 export function coverSrc(covers: (string | null | undefined)[] | string | null | undefined, size = 256): string | null {

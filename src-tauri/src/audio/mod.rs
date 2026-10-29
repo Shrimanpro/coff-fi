@@ -49,6 +49,8 @@ pub enum Cmd {
     Config(PlaybackCfg),
     Device(Option<String>),
     QueueChanged,
+    /// Sleep timer: pause when the current song ends (instead of moving on).
+    StopAfterCurrent(bool),
 }
 
 #[derive(Clone, Debug, Default, Serialize, PartialEq)]
@@ -65,6 +67,8 @@ pub enum Event {
     /// Fired once per listen when the play counts (30 s or half the track).
     Played(i64),
     Error(String),
+    /// The "stop after this song" sleep timer fired.
+    Slept,
 }
 
 #[derive(Clone)]
@@ -238,6 +242,7 @@ struct Engine {
     ended: bool,
     playing: bool,
     counted: bool,
+    stop_after: bool,
     last_emit: Instant,
     last_status: Status,
     mix: Vec<f32>,
@@ -273,6 +278,7 @@ impl Engine {
             ended: false,
             playing: false,
             counted: false,
+            stop_after: false,
             last_emit: Instant::now(),
             last_status: Status::default(),
             mix: Vec::new(),
@@ -405,6 +411,13 @@ impl Engine {
                     let _ = self.load(id, pos, playing);
                 }
             }
+            Cmd::StopAfterCurrent(on) => {
+                self.stop_after = on;
+                // A pre-buffered next song (gapless/crossfade) has to go, or come back.
+                if self.bounds.len() > 1 || self.xf.is_some() || self.cur.as_ref().is_some_and(|c| Some(c.id) != self.audible()) || !on {
+                    self.rebuild();
+                }
+            }
             Cmd::QueueChanged => {
                 // If the next track was already pre-buffered, make sure it is still the right one.
                 let expected = self.queue.lock().peek_next();
@@ -525,6 +538,9 @@ impl Engine {
     }
 
     fn next_src(&mut self) -> Option<(Src, f64, f64)> {
+        if self.stop_after {
+            return None;
+        }
         let next = self.queue.lock().peek_next()?;
         match self.open_src(next, 0.0) {
             Ok(s) => Some(s),
@@ -634,6 +650,17 @@ impl Engine {
             let id = self.bounds[0].id;
             self.counted = false;
             if id < 0 {
+                if std::mem::take(&mut self.stop_after) {
+                    // Sleep timer: park on the next song, paused, instead of unloading.
+                    self.ended = false;
+                    let next = self.queue.lock().advance();
+                    match next {
+                        Some(n) => self.handle(Cmd::Load { id: n, start: 0.0, play: false }),
+                        None => self.stop(),
+                    }
+                    (self.emit)(Event::Slept);
+                    return;
+                }
                 self.stop();
                 return;
             }
