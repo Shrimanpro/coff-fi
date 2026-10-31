@@ -11,6 +11,7 @@
   let data = $state<Home | null>(null);
   let allAlbums = $state(false);
   let allArtists = $state(false);
+  let allPlaylists = $state(false);
 
   $effect(() => {
     ui.libVersion;
@@ -49,6 +50,23 @@
         {/each}
       </div>
     </section>
+
+    {#if data.server_playlists.length}
+      <section>
+        <div class="sec-head">
+          <h2>Playlists</h2>
+          <span class="count">from Navidrome</span>
+          {#if data.server_playlists.length > SHELF}
+            <button class="more" onclick={() => (allPlaylists = !allPlaylists)}>{allPlaylists ? "Show less" : `Show all ${data.server_playlists.length}`}</button>
+          {/if}
+        </div>
+        <div class="grid" class:shelf={!allPlaylists}>
+          {#each shelf(data.server_playlists, allPlaylists) as t (t.id)}
+            <TileC tile={t} />
+          {/each}
+        </div>
+      </section>
+    {/if}
 
     {#if data.albums.length}
       <section>

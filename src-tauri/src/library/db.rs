@@ -35,7 +35,7 @@ CREATE INDEX IF NOT EXISTS tracks_album ON tracks(album, album_artist);
 CREATE INDEX IF NOT EXISTS tracks_artist ON tracks(artist);
 CREATE TABLE IF NOT EXISTS covers(hash TEXT PRIMARY KEY, path TEXT NOT NULL, embedded INTEGER NOT NULL);
 CREATE TABLE IF NOT EXISTS folder_covers(dir TEXT PRIMARY KEY, hash TEXT NOT NULL);
-CREATE TABLE IF NOT EXISTS plays(track_id INTEGER NOT NULL, ts INTEGER NOT NULL);
+CREATE TABLE IF NOT EXISTS plays(track_id INTEGER NOT NULL, ts INTEGER NOT NULL, n INTEGER NOT NULL DEFAULT 1);
 CREATE INDEX IF NOT EXISTS plays_track ON plays(track_id);
 CREATE INDEX IF NOT EXISTS plays_ts ON plays(ts);
 CREATE TABLE IF NOT EXISTS favorites(track_id INTEGER PRIMARY KEY, ts INTEGER NOT NULL);
@@ -43,6 +43,9 @@ CREATE TABLE IF NOT EXISTS queues(id INTEGER PRIMARY KEY, name TEXT NOT NULL, ki
 CREATE TABLE IF NOT EXISTS queue_items(queue_id INTEGER NOT NULL, idx INTEGER NOT NULL, track_id INTEGER NOT NULL);
 CREATE INDEX IF NOT EXISTS queue_items_q ON queue_items(queue_id);
 CREATE TABLE IF NOT EXISTS settings(k TEXT PRIMARY KEY, v TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS server_playlists(id TEXT PRIMARY KEY, name TEXT NOT NULL, comment TEXT NOT NULL DEFAULT '', idx INTEGER NOT NULL, cover TEXT);
+CREATE TABLE IF NOT EXISTS server_playlist_items(playlist_id TEXT NOT NULL, idx INTEGER NOT NULL, track_id INTEGER NOT NULL);
+CREATE INDEX IF NOT EXISTS server_playlist_items_p ON server_playlist_items(playlist_id);
 CREATE TABLE IF NOT EXISTS lyrics(track_id INTEGER PRIMARY KEY, json TEXT NOT NULL, fetched_at INTEGER NOT NULL);
 ";
 
@@ -97,6 +100,15 @@ pub fn open(path: &Path) -> Result<Connection> {
     let conn = Connection::open(path)?;
     conn.busy_timeout(std::time::Duration::from_secs(5))?;
     conn.execute_batch(SCHEMA)?;
+    // `n` (plays per row) arrived with Navidrome sync, which imports server play counts in one row.
+    let has_n = conn.prepare("SELECT n FROM plays LIMIT 0").is_ok();
+    if !has_n {
+        conn.execute("ALTER TABLE plays ADD COLUMN n INTEGER NOT NULL DEFAULT 1", [])?;
+    }
+    // Playlist artwork from the server (its own cover, e.g. the image named in the .m3u8).
+    if conn.prepare("SELECT cover FROM server_playlists LIMIT 0").is_err() {
+        conn.execute("ALTER TABLE server_playlists ADD COLUMN cover TEXT", [])?;
+    }
     Ok(conn)
 }
 

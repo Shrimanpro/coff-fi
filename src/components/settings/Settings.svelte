@@ -3,12 +3,15 @@
   import { open } from "@tauri-apps/plugin-dialog";
   import { fade, scale } from "svelte/transition";
   import { api } from "../../lib/ipc";
-  import { conf, saveSettings, toast, ui } from "../../lib/state.svelte";
+  import { conf, saveSettings, setSource, toast, ui } from "../../lib/state.svelte";
   import Icon from "../Icon.svelte";
   import VSlider from "./VSlider.svelte";
 
   type Tab = "eq" | "library" | "playback" | "integrations" | "navidrome" | "devices";
-  let tab = $state<Tab>("eq");
+  let tab = $state<Tab>((ui.settingsTab as Tab) ?? "eq");
+  ui.settingsTab = null;
+  let ndBusy = $state(false);
+  let ndStatus = $state<{ ok: boolean; text: string } | null>(null);
   let devices = $state<string[]>([]);
   let lfUser = $state("");
   let lfPass = $state("");
@@ -134,6 +137,17 @@
     lfBusy = false;
   }
 
+  async function testNavidrome() {
+    ndBusy = true;
+    ndStatus = null;
+    try {
+      ndStatus = { ok: true, text: `Connected: ${await api.navidromeTest($state.snapshot(s.navidrome))}` };
+    } catch (e) {
+      ndStatus = { ok: false, text: String(e) };
+    }
+    ndBusy = false;
+  }
+
   function close() {
     ui.settingsOpen = false;
   }
@@ -145,7 +159,7 @@
 <div class="dialog glass" transition:scale={{ start: 0.96, duration: 260 }} role="dialog" aria-label="Settings">
   <nav>
     <h2>Settings</h2>
-    {#each [["eq", "Equalizer"], ["library", "Library"], ["playback", "Playback"], ["integrations", "Integrations"]] as [id, label] (id)}
+    {#each [["eq", "Equalizer"], ["library", "Library"], ["playback", "Playback"], ["integrations", "Integrations"], ["navidrome", "Navidrome"]] as [id, label] (id)}
       <button class:on={tab === id} onclick={() => (tab = id as Tab)}>{label}</button>
     {/each}
     {#if version}<span class="version">Coff-fi {version}</span>{/if}
@@ -289,6 +303,36 @@
           {#if s.lastfm.session_key}<span class="ok">Connected as {s.lastfm.username}</span>{/if}
         </div>
         <p class="help">Get an API key at last.fm/api/account/create. Your password is only used once to get a session.</p>
+      {:else if tab === "navidrome"}
+        <h3>Server</h3>
+        <input class="text" placeholder="Server address, e.g. https://music.example.com" bind:value={s.navidrome.url} onchange={() => saveSettings(0)} />
+        <div class="grid2">
+          <input class="text" placeholder="Username" autocomplete="off" bind:value={s.navidrome.username} onchange={() => saveSettings(0)} />
+          <input class="text" placeholder="Password" type="password" autocomplete="off" bind:value={s.navidrome.password} onchange={() => saveSettings(0)} />
+        </div>
+        <div class="line">
+          <button class="pill-btn ghost" disabled={ndBusy || !s.navidrome.url || !s.navidrome.username} onclick={testNavidrome}>{ndBusy ? "Testing…" : "Test connection"}</button>
+          {#if ndStatus}<span class:ok={ndStatus.ok} class:bad={!ndStatus.ok}>{ndStatus.text}</span>{/if}
+        </div>
+
+        <h3>Navidrome mode</h3>
+        <label class="switch">
+          <input type="checkbox" checked={s.navidrome.active} disabled={ui.switching} onchange={(e) => {
+            const want = e.currentTarget.checked;
+            e.currentTarget.checked = s.navidrome.active;
+            setSource(want);
+          }} /><span></span>
+          {ui.switching ? "Connecting…" : "Browse and play from the server"}
+        </label>
+        {#if s.navidrome.active}
+          <div class="line">
+            <button class="pill-btn" disabled={ui.scanning} onclick={() => api.rescan()}><Icon name="refresh" size={15} /> {ui.scanning ? "Syncing…" : "Sync library now"}</button>
+          </div>
+        {/if}
+        <p class="help">
+          Also switchable from the top-right toggle. The server's library is mirrored locally so browsing stays instant; songs stream in their
+          original quality. Play counts, stars and scrobbles sync with the server. The password is stored on this computer in the app's settings.
+        </p>
       {/if}
     {/if}
   </section>

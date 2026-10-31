@@ -1,7 +1,7 @@
 <script lang="ts">
   import { revealItemInDir } from "@tauri-apps/plugin-opener";
   import { quality } from "../lib/format";
-  import { api, blurSrc } from "../lib/ipc";
+  import { api, blurSrc, isRemote } from "../lib/ipc";
   import { anchors, enqueueTracks, openMenu, player, setVolume, toast, ui, volume } from "../lib/state.svelte";
   import Cover from "./Cover.svelte";
   import Icon from "./Icon.svelte";
@@ -28,8 +28,12 @@
       { label: "Go to artist", action: () => (ui.collection = { kind: "artist", id: tr.artist }) },
       { label: "Open folder", action: () => ((ui.collection = null), (ui.base = "directory"), (ui.dirPath = tr.dir)) },
       { label: "Play again next", action: () => enqueueTracks([tr], true) },
-      { label: "View / edit info", action: () => (ui.info = tr) },
-      { label: "Show file", action: () => revealItemInDir(tr.path).catch((x) => toast(String(x))) },
+      ...(isRemote(tr)
+        ? []
+        : [
+            { label: "View / edit info", action: () => (ui.info = tr) },
+            { label: "Show file", action: () => revealItemInDir(tr.path).catch((x) => toast(String(x))) },
+          ]),
     ]);
   }
 
@@ -93,7 +97,7 @@
     </div>
   </div>
   <div class="scrub-row">
-    <Scrubber middle={quality(t)} />
+    <Scrubber middle={`${isRemote(t) ? "Navidrome" : "Local"} · ${quality(t)}`} />
   </div>
 </div>
 

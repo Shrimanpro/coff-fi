@@ -20,6 +20,9 @@ fn source_bytes(conn: &Connection, hash: &str) -> Result<Vec<u8>> {
         .query_row("SELECT path, embedded FROM covers WHERE hash = ?1", [hash], |r| Ok((r.get(0)?, r.get(1)?)))
         .optional()?
         .ok_or_else(|| anyhow!("unknown cover {hash}"))?;
+    if let Some(id) = crate::navidrome::cover_id(&path) {
+        return crate::navidrome::cover_bytes(id);
+    }
     if !embedded {
         return Ok(std::fs::read(&path)?);
     }

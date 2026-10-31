@@ -134,7 +134,11 @@ pub fn get(conn: &Connection, t: &Track, refresh: bool) -> Result<Option<Lyrics>
 }
 
 fn resolve(conn: &Connection, t: &Track, refresh: bool) -> Result<Option<Lyrics>> {
-    let locals = local(Path::new(&t.path));
+    let locals = if t.path.starts_with(crate::navidrome::PREFIX) {
+        crate::navidrome::lyrics(&t.path).and_then(|text| Lyrics::from_text("Navidrome", &text)).into_iter().collect()
+    } else {
+        local(Path::new(&t.path))
+    };
     if let Some(l) = locals.iter().find(|l| l.synced != Synced::None) {
         return Ok(Some(l.clone()));
     }

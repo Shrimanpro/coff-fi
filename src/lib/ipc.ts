@@ -1,5 +1,5 @@
 import { convertFileSrc, invoke } from "@tauri-apps/api/core";
-import type { Collection, FileInfo, FolderView, Home, Lyrics, QueueView, Repeat, SavedQueue, SearchResults, Settings, SleepState, Status, Tags, Tile, Track } from "./types";
+import type { Collection, FileInfo, FolderView, Home, Lyrics, Navidrome, QueueView, Repeat, SavedQueue, SearchResults, Settings, SleepState, Status, Tags, Tile, Track } from "./types";
 export const api = {
   getSettings: () => invoke<Settings>("get_settings"),
   setSettings: (settings: Settings) => invoke<void>("set_settings", { settings }),
@@ -25,6 +25,8 @@ export const api = {
   loadQueue: (id: number) => invoke<void>("load_queue", { id }),
   saveQueue: (name: string) => invoke<void>("save_queue", { name }),
   deleteQueue: (id: number) => invoke<void>("delete_queue", { id }),
+  navidromeTest: (server: Navidrome) => invoke<string>("navidrome_test", { server }),
+  setSource: (remote: boolean) => invoke<string>("set_source", { remote }),
   search: (query: string) => invoke<SearchResults>("search", { query }),
   getTags: (id: number) => invoke<FileInfo>("get_tags", { id }),
   setTags: (id: number, tags: Tags) => invoke<Track>("set_tags", { id, tags }),
@@ -32,6 +34,10 @@ export const api = {
   getSleep: () => invoke<SleepState>("get_sleep"),
   sleepTimer: (mode: SleepState["mode"], minutes?: number) => invoke<SleepState>("sleep_timer", { mode, minutes }),
 };
+
+/** Tracks streamed from Navidrome carry a virtual `navidrome://` path. */
+export const isRemote = (t: { path: string } | null | undefined) => !!t?.path.startsWith("navidrome://");
+
 /** Square cover image for a set of cover hashes (single cover or 2×2 collage). */
 export function coverSrc(covers: (string | null | undefined)[] | string | null | undefined, size = 256): string | null {
   const list = (Array.isArray(covers) ? covers : [covers]).filter((c): c is string => !!c);

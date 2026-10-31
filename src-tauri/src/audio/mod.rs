@@ -49,6 +49,8 @@ pub enum Cmd {
     Config(PlaybackCfg),
     Device(Option<String>),
     QueueChanged,
+    /// Switch to another library database (local ↔ Navidrome). Stops playback.
+    Database(PathBuf),
     /// Sleep timer: pause when the current song ends (instead of moving on).
     StopAfterCurrent(bool),
 }
@@ -378,6 +380,13 @@ impl Engine {
                 }
             }
             Cmd::Stop => self.stop(),
+            Cmd::Database(path) => {
+                self.stop();
+                match db::open(&path) {
+                    Ok(c) => self.conn = c,
+                    Err(e) => (self.emit)(Event::Error(format!("Couldn't open library: {e:#}"))),
+                }
+            }
             Cmd::Volume(v) => {
                 self.volume = v;
                 if let Some(o) = &self.out {

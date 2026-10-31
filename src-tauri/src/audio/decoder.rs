@@ -22,7 +22,12 @@ pub struct Decoder {
 
 impl Decoder {
     pub fn open(path: &Path) -> Result<Self> {
-        let src: Box<dyn MediaSource> = Box::new(File::open(path)?);
+        let p = path.to_string_lossy();
+        let src: Box<dyn MediaSource> = if p.starts_with(crate::navidrome::PREFIX) {
+            Box::new(crate::navidrome::Stream::open(&p)?)
+        } else {
+            Box::new(File::open(path)?)
+        };
         let mss = MediaSourceStream::new(src, Default::default());
         let mut hint = Hint::new();
         if let Some(ext) = path.extension().and_then(|e| e.to_str()) {

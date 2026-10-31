@@ -13,12 +13,15 @@ export const ui = $state({
   collection: null as { kind: TileKind; id: string } | null,
   fullscreen: false,
   settingsOpen: false,
+  settingsTab: null as string | null,
   /** Local song whose info/tag editor is open. */
   info: null as Track | null,
   /** The centred search palette (Cmd/Ctrl+K). */
   palette: false,
   /** A song to scroll to and highlight once its album opens ("go to track"). */
   focusTrack: null as number | null,
+  /** Switching between local files and Navidrome (connection check in flight). */
+  switching: false,
   leftPinned: false,
   theme: (document.documentElement.dataset.theme as "dark" | "light") || (matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark"),
   scanning: false,
@@ -184,7 +187,33 @@ export async function init() {
       refreshFav();
     }),
     listen<string>("app://error", (e) => toast(e.payload)),
+    listen<boolean>("source://changed", async () => {
+      ui.collection = null;
+      ui.dirPath = null;
+      // Pages from the other library can't be revisited.
+      clearHistory();
+      conf.s = await api.getSettings();
+    }),
   ]);
+}
+
+/** Turns Navidrome mode on or off. Turning it on needs a reachable, configured server. */
+export async function setSource(remote: boolean) {
+  const nd = conf.s?.navidrome;
+  if (remote && (!nd?.url.trim() || !nd.username.trim())) {
+    toast("Set up your Navidrome server first");
+    ui.settingsTab = "navidrome";
+    ui.settingsOpen = true;
+    return;
+  }
+  ui.switching = true;
+  try {
+    const label = await api.setSource(remote);
+    toast(remote ? `Connected to ${label}` : "Back to local files");
+  } catch (e) {
+    toast(`Couldn't connect to Navidrome: ${e}`);
+  }
+  ui.switching = false;
 }
 
 // ---------- actions ----------

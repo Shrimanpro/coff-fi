@@ -2,6 +2,7 @@ mod audio;
 mod integrations;
 mod library;
 mod lyrics;
+mod navidrome;
 mod queue;
 mod settings;
 
@@ -19,7 +20,7 @@ use audio::{Cmd, Event, PlaybackCfg, Player, Status};
 use integrations::{Control, Integrations, Msg, NowPlaying};
 use library::{covers, db, scan, Collection, FolderView, Home, SearchResults, Tile};
 use queue::Queue;
-use settings::{Repeat, Settings};
+use settings::{Navidrome, Repeat, Settings};
 
 type Res<T> = Result<T, String>;
 
@@ -30,8 +31,11 @@ fn err(e: impl std::fmt::Display) -> String {
 }
 
 pub struct AppState {
+    /// The active library: local files or the Navidrome mirror.
     db: Mutex<Connection>,
     db_path: RwLock<PathBuf>,
+    local_path: PathBuf,
+    remote_path: PathBuf,
     /// Settings always live in the local database, whichever library is active.
     cfg_db: Mutex<Connection>,
     settings: RwLock<Settings>,
@@ -56,6 +60,12 @@ struct SleepState {
 
 const HISTORY_KEEP: i64 = 20;
 
+impl AppState {
+    fn remote(&self) -> bool {
+        *self.db_path.read() == self.remote_path
+    }
+}
+
 // ---------- settings ----------
 
 fn save_settings(conn: &Connection, s: &Settings) -> Res<()> {
@@ -71,6 +81,8 @@ fn get_settings(st: State<AppState>) -> Settings {
 fn set_settings(app: AppHandle, st: State<AppState>, settings: Settings) -> Res<()> {
     let old = st.settings.read().clone();
     let mut s = settings;
+    // Switching sources goes through `set_source`, which checks the connection first.
+    s.navidrome.active = old.navidrome.active;
     save_settings(&st.cfg_db.lock(), &s)?;
     *st.settings.write() = s.clone();
     if s.volume != old.volume {
@@ -94,8 +106,13 @@ fn set_settings(app: AppHandle, st: State<AppState>, settings: Settings) -> Res<
         }
         queue_changed(&app, &st);
     }
-    if s.roots != old.roots || s.excluded != old.excluded || s.watch != old.watch {
+    let remote = st.remote();
+    if !remote && (s.roots != old.roots || s.excluded != old.excluded || s.watch != old.watch) {
         start_watcher(&app, &st);
+        rescan_now(&app);
+    }
+    if remote && s.navidrome != old.navidrome {
+        navidrome::configure(Some(s.navidrome.clone()));
         rescan_now(&app);
     }
     st.integrations.send(Msg::Config(Box::new(s)));
@@ -159,6 +176,66 @@ async fn lastfm_login(app: AppHandle, username: String, password: String) -> Res
     Ok(())
 }
 
+// ---------- navidrome ----------
+
+#[tauri::command]
+async fn navidrome_test(server: Navidrome) -> Res<String> {
+    tauri::async_runtime::spawn_blocking(move || navidrome::ping(&server)).await.map_err(err)?.map_err(|e| format!("{e:#}"))
+}
+
+/// Switches between local files and the Navidrome server. Turning Navidrome on requires a
+/// working connection. Returns a description of the active source.
+#[tauri::command]
+async fn set_source(app: AppHandle, remote: bool) -> Res<String> {
+    let st = app.state::<AppState>();
+    let server = st.settings.read().navidrome.clone();
+    let label = if remote {
+        let srv = server.clone();
+        let name = tauri::async_runtime::spawn_blocking(move || navidrome::ping(&srv)).await.map_err(err)?.map_err(|e| format!("{e:#}"))?;
+        navidrome::configure(Some(server));
+        name
+    } else {
+        "Local files".to_string()
+    };
+    switch_source(&app, remote)?;
+    if remote {
+        rescan_now(&app);
+    }
+    Ok(label)
+}
+
+fn switch_source(app: &AppHandle, remote: bool) -> Res<()> {
+    let st = app.state::<AppState>();
+    let path = if remote { st.remote_path.clone() } else { st.local_path.clone() };
+    if *st.db_path.read() != path {
+        // Each library keeps its own queues; park the current one before leaving.
+        let q = st.player.queue.lock().clone();
+        let _ = persist_current(&mut st.db.lock(), &q);
+        st.player.send(Cmd::Database(path.clone()));
+        let conn = db::open(&path).map_err(err)?;
+        let q = load_current_queue(&conn, &st.settings.read());
+        *st.random.write() = library::random_ids(&conn).unwrap_or_default();
+        *st.db.lock() = conn;
+        *st.db_path.write() = path.clone();
+        *ACTIVE_DB.write() = Some(path);
+        *st.player.queue.lock() = q;
+        start_watcher(app, &st);
+    }
+    let s = {
+        let mut s = st.settings.write();
+        s.navidrome.active = remote;
+        s.clone()
+    };
+    save_settings(&st.cfg_db.lock(), &s)?;
+    if !remote {
+        navidrome::configure(None);
+    }
+    let _ = app.emit("source://changed", remote);
+    let _ = app.emit("library://changed", ());
+    let _ = app.emit("queue://changed", ());
+    Ok(())
+}
+
 fn load_current_queue(conn: &Connection, s: &Settings) -> Queue {
     let mut q = Queue::default();
     q.shuffle = s.shuffle;
@@ -188,8 +265,9 @@ fn rescan_now(app: &AppHandle) {
                 (s.roots.clone(), s.excluded.clone())
             };
             let path = st.db_path.read().clone();
+            let remote = path == st.remote_path;
             match db::open(&path).and_then(|mut c| {
-                let stats = scan::scan(&mut c, &roots, &excluded)?;
+                let stats = if remote { navidrome::sync(&mut c)? } else { scan::scan(&mut c, &roots, &excluded)? };
                 Ok((stats, library::random_ids(&c)?))
             }) {
                 // The source may have changed while scanning; only publish results for the active one.
@@ -200,6 +278,10 @@ fn rescan_now(app: &AppHandle) {
                     let _ = app.emit("library://changed", &stats);
                 }
                 Ok(_) => {}
+                Err(e) if remote => {
+                    let _ = app.emit("app://error", format!("Couldn't sync with Navidrome, switched back to local files. {e:#}"));
+                    let _ = switch_source(&app, false);
+                }
                 Err(e) => {
                     let _ = app.emit("app://error", format!("Library scan failed: {e:#}"));
                 }
@@ -217,7 +299,7 @@ fn start_watcher(app: &AppHandle, st: &AppState) {
     let s = st.settings.read().clone();
     let mut w = st.watcher.lock();
     *w = None;
-    if s.watch {
+    if s.watch && !st.remote() {
         let handle = app.clone();
         match library::watch::watch(&s.roots, move || rescan_now(&handle)) {
             Ok(x) => *w = Some(x),
@@ -239,7 +321,7 @@ async fn get_home(st: State<'_, AppState>) -> Res<Home> {
 
 #[tauri::command]
 async fn get_roots(st: State<'_, AppState>) -> Res<Vec<Tile>> {
-    let roots = st.settings.read().roots.clone();
+    let roots = if st.remote() { vec![navidrome::ROOT.to_string()] } else { st.settings.read().roots.clone() };
     library::root_tiles(&st.db.lock(), &roots).map_err(err)
 }
 
@@ -258,6 +340,9 @@ async fn get_collection(st: State<'_, AppState>, kind: String, id: String) -> Re
 
 /// Path of a local library song; Navidrome songs aren't files we can edit.
 fn local_file(st: &AppState, id: i64) -> Res<String> {
+    if st.remote() {
+        return Err("Only local files can be edited".into());
+    }
     Ok(db::track(&st.db.lock(), id).map_err(err)?.ok_or("Song not found")?.path)
 }
 
@@ -301,6 +386,9 @@ fn toggle_favorite(app: AppHandle, st: State<AppState>, id: i64) -> Res<bool> {
     let fav = {
         let conn = st.db.lock();
         let fav = db::toggle_favorite(&conn, id).map_err(err)?;
+        if let Some(t) = db::track(&conn, id).ok().flatten() {
+            navidrome::set_star(&t.path, fav);
+        }
         fav
     };
     let _ = app.emit("stats://changed", ());
@@ -633,6 +721,7 @@ fn on_player_event(app: &AppHandle, e: Event) {
             let track = id.and_then(|id| db::track(&st.db.lock(), id).ok().flatten());
             let _ = app.emit("player://track", &track);
             if let Some(t) = &track {
+                navidrome::scrobble(&t.path, false);
                 // Warm the lyrics cache so the full-screen view has them immediately.
                 let (t, path) = (t.clone(), st.db_path.read().clone());
                 std::thread::spawn(move || {
@@ -662,6 +751,9 @@ fn on_player_event(app: &AppHandle, e: Event) {
             {
                 let conn = st.db.lock();
                 let _ = db::record_play(&conn, id);
+                if let Some(t) = db::track(&conn, id).ok().flatten() {
+                    navidrome::scrobble(&t.path, true);
+                }
             }
             st.integrations.send(Msg::Played);
             let _ = app.emit("stats://changed", ());
@@ -741,7 +833,9 @@ pub fn run() {
             std::fs::create_dir_all(&data)?;
             std::fs::create_dir_all(&thumbs)?;
             let local_path = data.join("library.db");
+            let remote_path = data.join("navidrome.db");
             let _ = THUMBS.set(thumbs.clone());
+            navidrome::init(app.path().app_cache_dir()?);
             let cfg_conn = db::open(&local_path)?;
             let conn = &cfg_conn;
 
@@ -755,7 +849,13 @@ pub fn run() {
                 }
             }
 
-            let db_path = local_path.clone();
+            // Navidrome mode resumes on the last synced mirror; the startup sync verifies the
+            // connection and falls back to local files if the server is unreachable.
+            let remote = s.navidrome.active;
+            if remote {
+                navidrome::configure(Some(s.navidrome.clone()));
+            }
+            let db_path = if remote { remote_path.clone() } else { local_path.clone() };
             *ACTIVE_DB.write() = Some(db_path.clone());
             let conn = db::open(&db_path)?;
             let q = load_current_queue(&conn, &s);
@@ -774,6 +874,8 @@ pub fn run() {
             app.manage(AppState {
                 db: Mutex::new(conn),
                 db_path: RwLock::new(db_path),
+                local_path,
+                remote_path,
                 cfg_db: Mutex::new(cfg_conn),
                 settings: RwLock::new(s),
                 player,
@@ -815,7 +917,9 @@ pub fn run() {
             load_queue,
             save_queue,
             delete_queue,
+            navidrome_test,
             search,
+            set_source,
             get_tags,
             set_tags,
             get_sleep,

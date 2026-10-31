@@ -1,12 +1,13 @@
 <script lang="ts">
   import { getCurrentWindow } from "@tauri-apps/api/window";
-  import { player, setTheme, ui } from "../lib/state.svelte";
+  import { conf, player, setSource, setTheme, ui } from "../lib/state.svelte";
   import Icon from "./Icon.svelte";
   import Logo from "./Logo.svelte";
   import Search from "./Search.svelte";
 
   const mac = navigator.userAgent.includes("Mac");
   const view = $derived(ui.base);
+  const remote = $derived(!!conf.s?.navidrome.active);
 
   // The whole bar acts as a title bar (macOS has none with the overlay style):
   // press anywhere but a control to move the window, double-click to zoom.
@@ -53,6 +54,17 @@
 
   <div class="right">
     <Search />
+  <label class="source glass" class:busy={ui.switching} title={remote ? "Browsing your Navidrome server" : "Browsing local files"}>
+    <span class="src-label">{ui.switching ? "Connecting…" : "Navidrome"}</span>
+    <span class="switch">
+      <input type="checkbox" checked={remote} disabled={ui.switching} onchange={(e) => {
+        const want = e.currentTarget.checked;
+        e.currentTarget.checked = remote; // reflect the real state until the switch succeeds
+        setSource(want);
+      }} />
+      <span></span>
+    </span>
+  </label>
   </div>
 </header>
 

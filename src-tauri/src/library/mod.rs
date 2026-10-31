@@ -35,6 +35,8 @@ pub struct Tile {
 #[derive(Serialize)]
 pub struct Home {
     pub playlists: Vec<Tile>,
+    /// Playlists made on the Navidrome server (empty for local files).
+    pub server_playlists: Vec<Tile>,
     pub albums: Vec<Tile>,
     pub artists: Vec<Tile>,
     pub songs: Vec<Track>,
@@ -93,7 +95,7 @@ pub fn smart_tracks(conn: &Connection, id: &str, random: &[i64]) -> Result<Vec<T
         "recent_added" => tracks_where(conn, &format!("ORDER BY t.added_at DESC, t.mtime DESC LIMIT {lim}"), []),
         "most_played" => tracks_where(
             conn,
-            &format!("JOIN (SELECT track_id, COUNT(*) c FROM plays GROUP BY track_id) p ON p.track_id = t.id ORDER BY p.c DESC, t.title LIMIT {lim}"),
+            &format!("JOIN (SELECT track_id, SUM(n) c FROM plays GROUP BY track_id) p ON p.track_id = t.id ORDER BY p.c DESC, t.title LIMIT {lim}"),
             [],
         ),
         "favorites" => tracks_where(conn, "JOIN favorites f ON f.track_id = t.id ORDER BY f.ts DESC", []),
@@ -147,7 +149,34 @@ pub fn home(conn: &Connection, random: &[i64]) -> Result<Home> {
         "SELECT artist, '', COUNT(*), MAX(cover) FROM tracks GROUP BY artist ORDER BY artist COLLATE NOCASE",
     )?;
     let songs = tracks_where(conn, "ORDER BY t.title COLLATE NOCASE", [])?;
-    Ok(Home { playlists, albums, artists, songs })
+    let server_playlists = server_playlists(conn, None)?;
+    Ok(Home { playlists, server_playlists, albums, artists, songs })
+}
+
+/// Tile id prefix for server playlists, so they share the "playlist" collection kind with smart ones.
+const SERVER_PL: &str = "nd:";
+
+fn server_playlist_tracks(conn: &Connection, id: &str) -> Result<Vec<Track>> {
+    tracks_where(conn, "JOIN server_playlist_items i ON i.track_id = t.id WHERE i.playlist_id = ?1 ORDER BY i.idx", [id])
+}
+
+/// Server playlists, optionally only those whose name contains `like` (a LIKE pattern).
+fn server_playlists(conn: &Connection, like: Option<&str>) -> Result<Vec<Tile>> {
+    let mut st = conn.prepare_cached("SELECT id, name, cover FROM server_playlists WHERE ?1 IS NULL OR name LIKE ?1 ESCAPE '\\' ORDER BY idx")?;
+    let rows: Vec<(String, String, Option<String>)> = st.query_map([like], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)))?.collect::<rusqlite::Result<_>>()?;
+    rows.into_iter()
+        .map(|(id, name, cover)| {
+            let tracks = server_playlist_tracks(conn, &id)?;
+            Ok(Tile {
+                kind: "playlist",
+                id: format!("{SERVER_PL}{id}"),
+                name,
+                subtitle: format!("{} songs", tracks.len()),
+                count: tracks.len(),
+                covers: cover.map_or_else(|| first_covers(tracks.iter().map(|t| &t.cover), 4), |c| vec![c]),
+            })
+        })
+        .collect()
 }
 
 #[derive(Serialize)]
@@ -218,6 +247,8 @@ pub fn search(conn: &Connection, query: &str) -> Result<SearchResults> {
             });
         }
     }
+    let pattern = format!("%{}%", like_escape(query.trim()));
+    playlists.extend(server_playlists(conn, Some(&pattern))?);
     Ok(SearchResults { songs, albums, artists, playlists })
 }
 
@@ -273,6 +304,12 @@ pub fn folder_view(conn: &Connection, path: &str) -> Result<FolderView> {
 
 pub fn collection(conn: &Connection, kind: &str, id: &str, random: &[i64]) -> Result<Collection> {
     let (title, subtitle, tracks) = match kind {
+        "playlist" if id.starts_with(SERVER_PL) => {
+            use rusqlite::OptionalExtension;
+            let pid = &id[SERVER_PL.len()..];
+            let name: String = conn.query_row("SELECT name FROM server_playlists WHERE id = ?1", [pid], |r| r.get(0)).optional()?.unwrap_or_default();
+            (name, "Navidrome playlist".to_string(), server_playlist_tracks(conn, pid)?)
+        }
         "playlist" => {
             let name = SMART.iter().find(|(k, _)| *k == id).map(|(_, n)| n.to_string()).unwrap_or_default();
             (name, "Playlist".to_string(), smart_tracks(conn, id, random)?)
@@ -294,7 +331,15 @@ pub fn collection(conn: &Connection, kind: &str, id: &str, random: &[i64]) -> Re
             (folder_name(&dir), "Folder".into(), t)
         }
     };
-    let covers = if kind == "folder" {
+    let server_cover = if kind == "playlist" && id.starts_with(SERVER_PL) {
+        use rusqlite::OptionalExtension;
+        conn.query_row("SELECT cover FROM server_playlists WHERE id = ?1", [&id[SERVER_PL.len()..]], |r| r.get::<_, Option<String>>(0)).optional()?.flatten()
+    } else {
+        None
+    };
+    let covers = if let Some(c) = server_cover {
+        vec![c]
+    } else if kind == "folder" {
         db_folder_cover(conn, id)?.map(|h| vec![h]).unwrap_or_else(|| first_covers(tracks.iter().map(|t| &t.cover), 4))
     } else if kind == "album" {
         first_covers(tracks.iter().map(|t| &t.cover), 1)

@@ -49,6 +49,8 @@ export interface Tile {
 
 export interface Home {
   playlists: Tile[];
+  /** Playlists made on the Navidrome server (empty for local files). */
+  server_playlists: Tile[];
   albums: Tile[];
   artists: Tile[];
   songs: Track[];
@@ -148,6 +150,7 @@ export interface Settings {
   media_controls: boolean;
   discord: { enabled: boolean };
   lastfm: { enabled: boolean; api_key: string; api_secret: string; username: string; session_key: string };
+  navidrome: Navidrome;
 }
 
 export interface SearchResults {
@@ -161,5 +164,13 @@ export interface SleepState {
   mode: "off" | "minutes" | "end_of_track";
   /** Unix ms when a "minutes" timer pauses playback. */
   until: number | null;
+}
+
+export interface Navidrome {
+  /** True while the app browses the server instead of local files. */
+  active: boolean;
+  url: string;
+  username: string;
+  password: string;
 }
 

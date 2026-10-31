@@ -61,6 +61,16 @@ pub struct LastFm {
     pub session_key: String,
 }
 
+/// A Navidrome (Subsonic API) server. `active` = the app is browsing the server instead of local files.
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Default)]
+#[serde(default)]
+pub struct Navidrome {
+    pub active: bool,
+    pub url: String,
+    pub username: String,
+    pub password: String,
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 #[serde(default)]
 pub struct Settings {
@@ -81,6 +91,7 @@ pub struct Settings {
     pub media_controls: bool,
     pub discord: Discord,
     pub lastfm: LastFm,
+    pub navidrome: Navidrome,
 }
 
 impl Default for Settings {
@@ -103,6 +114,7 @@ impl Default for Settings {
             media_controls: true,
             discord: Discord::default(),
             lastfm: LastFm::default(),
+            navidrome: Navidrome::default(),
         }
     }
 }

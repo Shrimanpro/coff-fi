@@ -32,7 +32,7 @@
     const p = data?.path;
     if (!p || !conf.s) return [];
     const sep = p.includes("\\") && !p.includes("/") ? "\\" : "/";
-    const roots = conf.s.roots;
+    const roots = conf.s.navidrome.active ? ["Navidrome"] : conf.s.roots;
     const root = roots.map((r) => r.replace(/[\\/]+$/, "")).find((r) => p === r || p.startsWith(r + sep));
     if (!root) return [{ name: data!.name, path: p }];
     const out = [{ name: root.split(sep).pop() || root, path: root }];
