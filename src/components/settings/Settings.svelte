@@ -159,7 +159,7 @@
 <div class="dialog glass" transition:scale={{ start: 0.96, duration: 260 }} role="dialog" aria-label="Settings">
   <nav>
     <h2>Settings</h2>
-    {#each [["eq", "Equalizer"], ["library", "Library"], ["playback", "Playback"], ["integrations", "Integrations"], ["navidrome", "Navidrome"]] as [id, label] (id)}
+    {#each [["eq", "Equalizer"], ["library", "Library"], ["playback", "Playback"], ["integrations", "Integrations"], ["navidrome", "Navidrome"], ["devices", "Devices"]] as [id, label] (id)}
       <button class:on={tab === id} onclick={() => (tab = id as Tab)}>{label}</button>
     {/each}
     {#if version}<span class="version">Coff-fi {version}</span>{/if}
@@ -303,6 +303,15 @@
           {#if s.lastfm.session_key}<span class="ok">Connected as {s.lastfm.username}</span>{/if}
         </div>
         <p class="help">Get an API key at last.fm/api/account/create. Your password is only used once to get a session.</p>
+      {:else if tab === "devices"}
+        <h3>Control from other devices</h3>
+        <label class="switch"><input type="checkbox" bind:checked={s.remote.allow} onchange={() => saveSettings(0)} /><span></span> Let other devices on this Wi-Fi control playback here</label>
+        <p class="help">
+          Coff-fi on your other Mac or iPhone can then see this one under “Play on” and play, pause, skip, browse this library and change the queue.
+        </p>
+        <h3>Device name</h3>
+        <input class="text" placeholder="Name shown to other devices" bind:value={s.remote.name} onchange={() => saveSettings(0)} />
+        <p class="help">What other devices call this one. Leave empty to use the computer's name.</p>
       {:else if tab === "navidrome"}
         <h3>Server</h3>
         <input class="text" placeholder="Server address, e.g. https://music.example.com" bind:value={s.navidrome.url} onchange={() => saveSettings(0)} />

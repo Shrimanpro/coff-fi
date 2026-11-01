@@ -71,6 +71,24 @@ pub struct Navidrome {
     pub password: String,
 }
 
+/// Controlling playback across devices on the local network.
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+#[serde(default)]
+pub struct Remote {
+    /// Let other Coff-fi devices on the network see and control this one.
+    pub allow: bool,
+    /// Shown to other devices; empty = the computer / phone name.
+    pub name: String,
+    /// Stable random id, so a device recognises itself in Bonjour results.
+    pub id: String,
+}
+
+impl Default for Remote {
+    fn default() -> Self {
+        Self { allow: true, name: String::new(), id: String::new() }
+    }
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 #[serde(default)]
 pub struct Settings {
@@ -92,6 +110,7 @@ pub struct Settings {
     pub discord: Discord,
     pub lastfm: LastFm,
     pub navidrome: Navidrome,
+    pub remote: Remote,
 }
 
 impl Default for Settings {
@@ -115,6 +134,7 @@ impl Default for Settings {
             discord: Discord::default(),
             lastfm: LastFm::default(),
             navidrome: Navidrome::default(),
+            remote: Remote::default(),
         }
     }
 }

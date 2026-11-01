@@ -4,6 +4,7 @@ mod library;
 mod lyrics;
 mod navidrome;
 mod queue;
+mod remote;
 mod settings;
 
 use std::cell::RefCell;
@@ -83,6 +84,7 @@ fn set_settings(app: AppHandle, st: State<AppState>, settings: Settings) -> Res<
     let mut s = settings;
     // Switching sources goes through `set_source`, which checks the connection first.
     s.navidrome.active = old.navidrome.active;
+    s.remote.id = old.remote.id.clone();
     save_settings(&st.cfg_db.lock(), &s)?;
     *st.settings.write() = s.clone();
     if s.volume != old.volume {
@@ -115,8 +117,22 @@ fn set_settings(app: AppHandle, st: State<AppState>, settings: Settings) -> Res<
         navidrome::configure(Some(s.navidrome.clone()));
         rescan_now(&app);
     }
+    let remote_changed = s.remote != old.remote;
+    let mode = (s.volume, s.shuffle, s.repeat) != (old.volume, old.shuffle, old.repeat);
     st.integrations.send(Msg::Config(Box::new(s)));
+    if remote_changed {
+        remote::apply(&app);
+    }
+    if mode {
+        mode_changed(&app);
+    }
     Ok(())
+}
+
+/// Tells controlling devices about volume / shuffle / repeat changes.
+fn mode_changed(app: &AppHandle) {
+    let s = app.state::<AppState>().settings.read().clone();
+    let _ = app.emit("player://mode", serde_json::json!({ "volume": s.volume, "shuffle": s.shuffle, "repeat": s.repeat }));
 }
 
 /// Shuffle / repeat without a full settings round-trip (also used by controlling devices, which
@@ -715,6 +731,9 @@ fn on_player_event(app: &AppHandle, e: Event) {
     match e {
         Event::State(s) => {
             st.integrations.send(Msg::Playback { playing: s.playing, position: s.position });
+            if let Ok(json) = serde_json::to_string(&s) {
+                remote::server::broadcast("player://state", &json);
+            }
                 let _ = app.emit("player://state", s);
         }
         Event::Track(id) => {
@@ -783,6 +802,20 @@ fn on_control(app: &AppHandle, c: Control) {
     });
 }
 
+// ---------- platform & iOS extras ----------
+
+fn get_platform() -> &'static str {
+    if cfg!(target_os = "ios") {
+        "ios"
+    } else if cfg!(target_os = "macos") {
+        "macos"
+    } else if cfg!(windows) {
+        "windows"
+    } else {
+        "linux"
+    }
+}
+
 #[tauri::command]
 fn get_sleep(st: State<AppState>) -> SleepState {
     let s = st.sleep.lock().clone();
@@ -840,6 +873,11 @@ pub fn run() {
             let conn = &cfg_conn;
 
             let mut s: Settings = db::get_setting(conn, "settings")?.and_then(|j| serde_json::from_str(&j).ok()).unwrap_or_default();
+            if s.remote.id.is_empty() {
+                let seed = format!("{:?}-{}-{}", std::time::SystemTime::now(), std::process::id(), data.display());
+                s.remote.id = format!("{:016x}", xxhash_rust::xxh3::xxh3_64(seed.as_bytes()));
+                save_settings(conn, &s).map_err(anyhow::Error::msg)?;
+            }
             if s.roots.is_empty() {
                 if let Ok(music) = app.path().audio_dir() {
                     if music.is_dir() {
@@ -890,6 +928,7 @@ pub fn run() {
             let st = app.state::<AppState>();
             start_watcher(app.handle(), &st);
             rescan_now(app.handle());
+            remote::init(app.handle());
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![

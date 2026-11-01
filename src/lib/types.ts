@@ -151,6 +151,8 @@ export interface Settings {
   discord: { enabled: boolean };
   lastfm: { enabled: boolean; api_key: string; api_secret: string; username: string; session_key: string };
   navidrome: Navidrome;
+  /** Being controlled from other devices on the network. */
+  remote: { allow: boolean; name: string; id: string };
 }
 
 export interface SearchResults {

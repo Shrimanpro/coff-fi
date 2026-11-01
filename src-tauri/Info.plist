@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!-- Merged into the macOS app bundle by Tauri. Needed for finding / being found by Coff-fi
+	     on other devices (remote control) under macOS's local network privacy. -->
+	<key>NSLocalNetworkUsageDescription</key>
+	<string>Coff-fi connects to your Navidrome server and to Coff-fi on your other devices, so you can control playback from one to the other.</string>
+	<key>NSBonjourServices</key>
+	<array>
+		<string>_coffi._tcp</string>
+	</array>
+</dict>
+</plist>
