@@ -1,5 +1,6 @@
 <script lang="ts">
   import { getCurrentWindow } from "@tauri-apps/api/window";
+  import { remote as connect } from "../lib/remote.svelte";
   import { conf, player, setSource, setTheme, ui } from "../lib/state.svelte";
   import Icon from "./Icon.svelte";
   import Logo from "./Logo.svelte";
@@ -54,6 +55,12 @@
 
   <div class="right">
     <Search />
+  {#if connect.target}
+  <button class="source glass on-device" title="Choose where music plays" onclick={() => (connect.picker = true)}>
+    <Icon name="devices" size={16} /><span class="src-label">On {connect.target.name}</span>
+  </button>
+  {:else}
+  <button class="source glass dev-btn" title="Play on another device" aria-label="Play on…" onclick={() => (connect.picker = true)}><Icon name="devices" size={16} /></button>
   <label class="source glass" class:busy={ui.switching} title={remote ? "Browsing your Navidrome server" : "Browsing local files"}>
     <span class="src-label">{ui.switching ? "Connecting…" : "Navidrome"}</span>
     <span class="switch">
@@ -65,6 +72,7 @@
       <span></span>
     </span>
   </label>
+  {/if}
   </div>
 </header>
 

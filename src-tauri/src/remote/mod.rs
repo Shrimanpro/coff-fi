@@ -6,13 +6,26 @@
 //! ([`dispatch`]) and shows the other device's events.
 
 pub mod bonjour;
+pub mod client;
 mod dispatch;
 pub mod server;
 
 use parking_lot::{Mutex, RwLock};
+use serde::{Deserialize, Serialize};
+use serde_json::{json, Value};
 use tauri::{AppHandle, Emitter, Listener, Manager};
 
 use crate::AppState;
+
+/// Another Coff-fi on the network.
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+pub struct Device {
+    pub id: String,
+    pub name: String,
+    pub platform: String,
+    pub host: String,
+    pub port: u16,
+}
 
 struct Host {
     server: server::Server,
@@ -21,6 +34,8 @@ struct Host {
 }
 
 static HOST: Mutex<Option<Host>> = Mutex::new(None);
+static BROWSER: Mutex<Option<bonjour::Browser>> = Mutex::new(None);
+static DEVICES: Mutex<Vec<Device>> = Mutex::new(Vec::new());
 /// The OS's name for this device (iOS hands it over at launch).
 static SYSTEM_NAME: RwLock<Option<String>> = parking_lot::const_rwlock(None);
 
@@ -57,12 +72,28 @@ pub fn my_name(app: &AppHandle) -> String {
     if custom.is_empty() { system_name() } else { custom }
 }
 
+/// Who we are, for the hello sent when connecting to another device.
+pub fn me(app: &AppHandle) -> Value {
+    let id = app.state::<AppState>().settings.read().remote.id.clone();
+    json!({ "id": id, "name": my_name(app), "platform": crate::get_platform() })
+}
+
+pub fn devices() -> Vec<Device> {
+    DEVICES.lock().clone()
+}
+
+pub fn find(id: &str) -> Option<Device> {
+    DEVICES.lock().iter().find(|d| d.id == id).cloned()
+}
+
 /// Starts sharing (per settings) and discovery, and forwards shared events to controllers.
 pub fn init(app: &AppHandle) {
     for &name in SHARED_EVENTS {
         app.listen_any(name, move |e| server::broadcast(name, e.payload()));
     }
+    client::init(app);
     apply(app);
+    start_browse(app);
 }
 
 /// Brings the server and the Bonjour advertisement in line with the settings.
@@ -111,3 +142,65 @@ fn advertise(app: &AppHandle, name: &str, port: u16) -> Option<bonjour::Registra
     }
 }
 
+fn start_browse(app: &AppHandle) {
+    let mut b = BROWSER.lock();
+    if b.is_some() {
+        return;
+    }
+    let me = app.state::<AppState>().settings.read().remote.id.clone();
+    let h = app.clone();
+    match bonjour::browse(move |mut found| {
+        found.sort_by_key(|f| std::cmp::Reverse(f.seq));
+        let mut seen = std::collections::HashSet::new();
+        let mut list: Vec<Device> = found
+            .into_iter()
+            .filter(|f| f.txt.get("id").is_none_or(|id| *id != me))
+            .filter(|f| seen.insert(f.txt.get("id").cloned().unwrap_or_else(|| f.instance.clone())))
+            .map(|f| Device {
+                id: f.txt.get("id").cloned().unwrap_or_else(|| f.instance.clone()),
+                name: f.txt.get("name").cloned().unwrap_or_else(|| f.instance.clone()),
+                platform: f.txt.get("platform").cloned().unwrap_or_default(),
+                host: f.host,
+                port: f.port,
+            })
+            .collect();
+        list.sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase()));
+        *DEVICES.lock() = list.clone();
+        let _ = h.emit("remote://devices", list);
+    }) {
+        Ok(br) => *b = Some(br),
+        Err(e) => eprintln!("remote: {e:#}"),
+    }
+}
+
+/// Parses "host", "host:port" or "[v6]:port" typed by the user.
+pub fn parse_address(s: &str) -> Option<(String, u16)> {
+    let s = s.trim().trim_start_matches("ws://").trim_end_matches('/');
+    if s.is_empty() {
+        return None;
+    }
+    if let Some(rest) = s.strip_prefix('[') {
+        let (h, tail) = rest.split_once(']')?;
+        let port = tail.strip_prefix(':').map_or(Some(server::DEFAULT_PORT), |p| p.parse().ok())?;
+        return Some((h.to_string(), port));
+    }
+    match s.rsplit_once(':') {
+        Some((h, p)) if !h.contains(':') => Some((h.to_string(), p.parse().ok()?)),
+        _ => Some((s.to_string(), server::DEFAULT_PORT)),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn addresses() {
+        assert_eq!(parse_address("192.168.1.4"), Some(("192.168.1.4".into(), server::DEFAULT_PORT)));
+        assert_eq!(parse_address(" mac.local:5000 "), Some(("mac.local".into(), 5000)));
+        assert_eq!(parse_address("[fe80::1]:9"), Some(("fe80::1".into(), 9)));
+        assert_eq!(parse_address("fe80::1"), Some(("fe80::1".into(), server::DEFAULT_PORT)));
+        assert_eq!(parse_address("mac.local:abc"), None);
+        assert_eq!(parse_address(""), None);
+    }
+}

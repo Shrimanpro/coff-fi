@@ -2,6 +2,7 @@
   import { onMount } from "svelte";
   import BackSwipe from "./components/BackSwipe.svelte";
   import ContextMenu from "./components/ContextMenu.svelte";
+  import DevicePicker from "./components/DevicePicker.svelte";
   import EdgePanel from "./components/EdgePanel.svelte";
   import FullPlayer from "./components/FullPlayer.svelte";
   import MiniPlayer from "./components/MiniPlayer.svelte";
@@ -136,6 +137,7 @@
 
 <BackSwipe />
 <ContextMenu />
+<DevicePicker />
 <Toast />
 
 <style>

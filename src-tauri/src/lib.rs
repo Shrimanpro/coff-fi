@@ -151,6 +151,66 @@ fn set_play_mode(app: AppHandle, st: State<AppState>, shuffle: Option<bool>, rep
     Ok(())
 }
 
+// ---------- other devices ----------
+
+#[tauri::command]
+fn remote_devices() -> Vec<remote::Device> {
+    remote::devices()
+}
+
+#[derive(Serialize)]
+struct RemoteState {
+    /// The device we're controlling, if any.
+    target: Option<remote::Device>,
+    /// Devices controlling us.
+    controllers: Vec<String>,
+    /// Our own name on the network.
+    name: String,
+}
+
+#[tauri::command]
+fn remote_state(app: AppHandle) -> RemoteState {
+    RemoteState { target: remote::client::target(), controllers: remote::server::controllers(), name: remote::my_name(&app) }
+}
+
+/// Starts controlling a discovered device (`id`) or one typed in by address.
+#[tauri::command]
+async fn remote_connect(app: AppHandle, id: Option<String>, address: Option<String>) -> Res<remote::Device> {
+    let device = match (id, address) {
+        (Some(id), _) => remote::find(&id).ok_or("That device isn't available any more")?,
+        (None, Some(a)) => {
+            let (host, port) = remote::parse_address(&a).ok_or("Enter an address like 192.168.1.20")?;
+            remote::Device { id: format!("{host}:{port}"), name: host.clone(), platform: String::new(), host, port }
+        }
+        _ => return Err("Pick a device".into()),
+    };
+    let (name, kind) = (device.name.clone(), if device.platform == "ios" { "iPhone" } else { "device" });
+    remote::client::connect(&app, device, remote::me(&app)).await.map_err(|e| {
+        use remote::client::Unreachable;
+        let hint = match e.downcast_ref::<Unreachable>() {
+            Some(Unreachable::NoAnswer) => format!(
+                " Make sure Coff-fi is open on {name}{}, both are on the same Wi-Fi, and Coff-fi is allowed under Local Network in Privacy & Security settings on both devices.",
+                if kind == "iPhone" { " (unlocked, or playing music)" } else { "" }
+            ),
+            Some(Unreachable::Refused) => format!(" Check that “Let other devices control playback” is on in {name}'s Coff-fi settings (Devices)."),
+            Some(Unreachable::NotFound) => " Open Coff-fi on it, then try again.".into(),
+            None => String::new(),
+        };
+        format!("Couldn't connect to {name}: {e:#}.{hint}")
+    })
+}
+
+#[tauri::command]
+fn remote_disconnect(app: AppHandle) {
+    remote::client::disconnect(&app, true);
+}
+
+/// Runs a library / queue / playback command on the device being controlled.
+#[tauri::command]
+async fn remote_call(cmd: String, args: Option<serde_json::Value>) -> Res<serde_json::Value> {
+    remote::client::call(&cmd, args.unwrap_or(serde_json::Value::Null)).await
+}
+
 /// Volume changes arrive at slider speed, so they skip the full settings round-trip.
 #[tauri::command]
 fn set_volume(st: State<AppState>, volume: f32) -> Res<()> {
@@ -713,7 +773,11 @@ fn cover_response(req: &Request<Vec<u8>>) -> Response<Vec<u8>> {
     let builder = Response::builder().header("Access-Control-Allow-Origin", "*");
     // convertFileSrc() percent-encodes the whole path, slashes included.
     let path = urlencoding::decode(req.uri().path()).map(|p| p.into_owned()).unwrap_or_default();
-    let result = serve_cover(&path);
+    // `/r/...`: a cover of the device we're controlling.
+    let result = match path.strip_prefix("/r/") {
+        Some(rest) => remote::client::cover(&format!("/{rest}")).ok_or_else(|| anyhow::anyhow!("no remote cover")),
+        None => serve_cover(&path),
+    };
     match result {
         Ok(bytes) => builder
             .header("Content-Type", "image/jpeg")
@@ -964,6 +1028,11 @@ pub fn run() {
             get_sleep,
             sleep_timer,
             set_play_mode,
+            remote_devices,
+            remote_state,
+            remote_connect,
+            remote_disconnect,
+            remote_call,
         ])
         .run(tauri::generate_context!())
         .expect("error while running Coff-fi");

@@ -2,8 +2,10 @@
   import { revealItemInDir } from "@tauri-apps/plugin-opener";
   import { quality } from "../lib/format";
   import { api, blurSrc, isRemote } from "../lib/ipc";
+  import { remote } from "../lib/remote.svelte";
   import { anchors, enqueueTracks, openMenu, player, setVolume, toast, ui, volume } from "../lib/state.svelte";
   import Cover from "./Cover.svelte";
+  import RemoteBadge from "./RemoteBadge.svelte";
   import Icon from "./Icon.svelte";
   import Scrubber from "./Scrubber.svelte";
   import Transport from "./Transport.svelte";
@@ -28,7 +30,7 @@
       { label: "Go to artist", action: () => (ui.collection = { kind: "artist", id: tr.artist }) },
       { label: "Open folder", action: () => ((ui.collection = null), (ui.base = "directory"), (ui.dirPath = tr.dir)) },
       { label: "Play again next", action: () => enqueueTracks([tr], true) },
-      ...(isRemote(tr)
+      ...(isRemote(tr) || remote.target
         ? []
         : [
             { label: "View / edit info", action: () => (ui.info = tr) },
@@ -67,6 +69,7 @@
     <div class="meta">
       <div class="title ellipsis">{t?.title ?? ""}</div>
       <div class="artist ellipsis">{t?.artist ?? ""}{t?.album ? ` — ${t.album}` : ""}</div>
+      {#if remote.target || remote.controllers.length}<div class="where"><RemoteBadge /></div>{/if}
     </div>
     <button class="icon-btn" class:on={player.fav} title={player.fav ? "Unfavorite" : "Favorite"} onclick={fav}>
       <Icon name={player.fav ? "star-fill" : "star"} />
@@ -76,6 +79,7 @@
     <div class="center"><Transport /></div>
 
     <div class="right">
+      <button class="icon-btn" class:on={!!remote.target} title="Play on…" onclick={() => (remote.picker = !remote.picker)}><Icon name="devices" /></button>
       <button class="icon-btn" title="Lyrics" onclick={() => (ui.fullscreen = true)}><Icon name="lyrics" /></button>
       <button class="icon-btn" class:on={ui.leftPinned} title="Queue" onclick={() => (ui.leftPinned = !ui.leftPinned)}><Icon name="queue" /></button>
       <div class="vol" class:open={volOpen} onwheel={wheel}>
@@ -97,7 +101,7 @@
     </div>
   </div>
   <div class="scrub-row">
-    <Scrubber middle={`${isRemote(t) ? "Navidrome" : "Local"} · ${quality(t)}`} />
+    <Scrubber middle={`${remote.target ? remote.target.name : isRemote(t) ? "Navidrome" : "Local"} · ${quality(t)}`} />
   </div>
 </div>
 

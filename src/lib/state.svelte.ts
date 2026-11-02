@@ -1,6 +1,7 @@
 import { listen } from "@tauri-apps/api/event";
 import { api } from "./ipc";
-import type { QueueView, Settings, SleepState, Status, Tile, TileKind, Track } from "./types";
+import { remote, remoteApi } from "./remote.svelte";
+import type { Device, PlayMode, QueueView, Settings, SleepState, Status, Tile, TileKind, Track } from "./types";
 
 export interface MenuItem {
   label: string;
@@ -147,14 +148,77 @@ async function syncPlayer() {
   player.track = st.track_id != null ? (queue.tracks.find((t) => t.id === st.track_id) ?? null) : null;
   refreshFav();
   player.sleep = await api.getSleep().catch(() => player.sleep);
+  if (remote.target) {
+    const info = await api.remoteInfo().catch(() => null);
+    if (info) remote.mode = { volume: info.volume, shuffle: info.shuffle, repeat: info.repeat };
+  }
 }
 
-function on<T>(name: string, fn: (payload: T) => void) {
-  return listen<T>(name, (e) => fn(e.payload));
+/** Run when the UI switches between this device and a controlled one (e.g. to reset navigation). */
+export const onTargetChange: (() => void)[] = [];
+
+async function setTarget(device: Device | null, reason?: string | null) {
+  const changed = remote.target?.id !== device?.id;
+  remote.target = device;
+  if (reason) toast(reason);
+  if (!changed) return;
+  // The pages showed the other library.
+  ui.collection = null;
+  ui.dirPath = null;
+  ui.info = null;
+  clearHistory();
+  onTargetChange.forEach((f) => f());
+  ui.libVersion++;
+  ui.statsVersion++;
+  await syncPlayer().catch((e) => toast(String(e)));
 }
+
+/** Starts controlling another device (null = play here again). */
+export async function controlDevice(d: Device | null, address?: string) {
+  remote.error = null;
+  if (!d && !address) {
+    remote.picker = false;
+    await remoteApi.disconnect();
+    return setTarget(null);
+  }
+  // The picker stays open (showing "Connecting…") until it worked or failed.
+  remote.connecting = d?.id ?? address ?? null;
+  try {
+    const dev = await remoteApi.connect(d?.id ?? null, address ?? null);
+    remote.picker = false;
+    await setTarget(dev);
+  } catch (e) {
+    remote.error = String(e);
+  } finally {
+    remote.connecting = null;
+  }
+}
+
+/**
+ * Listens to an event of the device the UI is showing: our own (`name`) normally, the
+ * controlled device's (`remote:name`) while controlling one.
+ */
+function on<T>(name: string, fn: (payload: T) => void) {
+  return Promise.all([
+    listen<T>(name, (e) => {
+      if (!remote.target) fn(e.payload);
+    }),
+    listen<T>(`remote:${name}`, (e) => {
+      if (remote.target) fn(e.payload);
+    }),
+  ]);
+}
+
 export async function init() {
   setTheme(ui.theme);
   conf.s = await api.getSettings();
+  const rs = await remoteApi.state().catch(() => null);
+  if (rs) {
+    remote.name = rs.name;
+    remote.controllers = rs.controllers;
+    remote.target = rs.target;
+  }
+  remote.devices = await remoteApi.devices().catch(() => []);
   await syncPlayer();
 
   await Promise.all([
@@ -172,6 +236,7 @@ export async function init() {
     on<SleepState>("sleep://changed", (p) => (player.sleep = p)),
     listen("settings://changed", async () => {
       conf.s = await api.getSettings();
+      remote.name = (await remoteApi.state().catch(() => null))?.name ?? remote.name;
     }),
     on<[number, boolean]>("player://favorite", (p) => {
       if (player.track?.id === p[0]) player.fav = p[1];
@@ -186,8 +251,17 @@ export async function init() {
       ui.statsVersion++;
       refreshFav();
     }),
+    listen<PlayMode>("remote:player://mode", (e) => (remote.mode = e.payload)),
+    listen<{ device: Device | null; reason: string | null }>("remote://target", (e) => setTarget(e.payload.device, e.payload.reason)),
+    listen<Device[]>("remote://devices", (e) => (remote.devices = e.payload)),
+    listen<{ names: string[]; joined: string | null; left: string | null }>("remote://controllers", (e) => {
+      remote.controllers = e.payload.names;
+      if (e.payload.joined) toast(`${e.payload.joined} is now controlling this device`);
+      else if (e.payload.left) toast(`${e.payload.left} stopped controlling this device`);
+    }),
     listen<string>("app://error", (e) => toast(e.payload)),
     listen<boolean>("source://changed", async () => {
+      if (remote.target) return;
       ui.collection = null;
       ui.dirPath = null;
       // Pages from the other library can't be revisited.
@@ -337,22 +411,23 @@ export const anchors = { miniArt: null as HTMLElement | null };
 
 export function toggleShuffle() {
   queue.shuffle = !queue.shuffle;
-  if (conf.s) conf.s.shuffle = queue.shuffle;
+  if (conf.s && !remote.target) conf.s.shuffle = queue.shuffle;
   api.setPlayMode({ shuffle: queue.shuffle }).catch((e) => toast(String(e)));
 }
 
 export function cycleRepeat() {
   const order = ["off", "all", "one"] as const;
   queue.repeat = order[(order.indexOf(queue.repeat) + 1) % 3];
-  if (conf.s) conf.s.repeat = queue.repeat;
+  if (conf.s && !remote.target) conf.s.repeat = queue.repeat;
   api.setPlayMode({ repeat: queue.repeat }).catch((e) => toast(String(e)));
 }
 
 export function volume(): number {
-  return conf.s?.volume ?? 0.8;
+  return remote.target ? remote.mode.volume : (conf.s?.volume ?? 0.8);
 }
 
 export function setVolume(v: number) {
-  if (conf.s) conf.s.volume = v;
+  if (remote.target) remote.mode.volume = v;
+  else if (conf.s) conf.s.volume = v;
   api.setVolume(v).catch(() => {});
 }

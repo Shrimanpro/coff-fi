@@ -176,3 +176,18 @@ export interface Navidrome {
   password: string;
 }
 
+/** Another Coff-fi on the local network. */
+export interface Device {
+  id: string;
+  name: string;
+  platform: string;
+  host: string;
+  port: number;
+}
+
+/** Volume and play mode of a device (the controlled one, while controlling). */
+export interface PlayMode {
+  volume: number;
+  shuffle: boolean;
+  repeat: Repeat;
+}

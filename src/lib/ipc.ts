@@ -1,5 +1,39 @@
-import { convertFileSrc, invoke } from "@tauri-apps/api/core";
-import type { Collection, FileInfo, FolderView, Home, Lyrics, Navidrome, QueueView, Repeat, SavedQueue, SearchResults, Settings, SleepState, Status, Tags, Tile, Track } from "./types";
+import { convertFileSrc, invoke as tauriInvoke } from "@tauri-apps/api/core";
+import { remote, remoteApi } from "./remote.svelte";
+import type { Collection, FileInfo, FolderView, Home, Lyrics, Navidrome, PlayMode, QueueView, Repeat, SavedQueue, SearchResults, Settings, SleepState, Status, Tags, Tile, Track } from "./types";
+
+/** Commands that run on the controlled device while controlling one (see remote/dispatch.rs). */
+const FORWARDED = new Set([
+  "get_home",
+  "get_roots",
+  "get_folder",
+  "get_collection",
+  "search",
+  "get_palette",
+  "get_lyrics",
+  "toggle_favorite",
+  "is_favorite",
+  "play_tracks",
+  "enqueue",
+  "player_cmd",
+  "get_status",
+  "set_volume",
+  "set_play_mode",
+  "get_sleep",
+  "sleep_timer",
+  "get_queue",
+  "queue_edit",
+  "list_queues",
+  "load_queue",
+  "save_queue",
+  "delete_queue",
+]);
+
+function invoke<T>(cmd: string, args?: Record<string, unknown>): Promise<T> {
+  if (remote.target && FORWARDED.has(cmd)) return remoteApi.call<T>(cmd, args);
+  return tauriInvoke<T>(cmd, args);
+}
+
 export const api = {
   getSettings: () => invoke<Settings>("get_settings"),
   setSettings: (settings: Settings) => invoke<void>("set_settings", { settings }),
@@ -31,6 +65,7 @@ export const api = {
   getTags: (id: number) => invoke<FileInfo>("get_tags", { id }),
   setTags: (id: number, tags: Tags) => invoke<Track>("set_tags", { id, tags }),
   setPlayMode: (mode: { shuffle?: boolean; repeat?: Repeat }) => invoke<void>("set_play_mode", { shuffle: mode.shuffle ?? null, repeat: mode.repeat ?? null }),
+  remoteInfo: () => remoteApi.call<PlayMode & { name: string; platform: string }>("remote_info"),
   getSleep: () => invoke<SleepState>("get_sleep"),
   sleepTimer: (mode: SleepState["mode"], minutes?: number) => invoke<SleepState>("sleep_timer", { mode, minutes }),
 };
@@ -50,6 +85,7 @@ export function blurSrc(hash: string): string {
   return convertFileSrc(`${coverRoot()}blur/${hash}`, "coffi");
 }
 
+/** Covers of the controlled device are fetched through it (`coffi://localhost/r/...`). */
 function coverRoot(): string {
-  return "";
+  return remote.target ? "r/" : "";
 }

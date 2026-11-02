@@ -3,6 +3,7 @@
   import { open } from "@tauri-apps/plugin-dialog";
   import { fade, scale } from "svelte/transition";
   import { api } from "../../lib/ipc";
+  import { remote } from "../../lib/remote.svelte";
   import { conf, saveSettings, setSource, toast, ui } from "../../lib/state.svelte";
   import Icon from "../Icon.svelte";
   import VSlider from "./VSlider.svelte";
@@ -310,8 +311,16 @@
           Coff-fi on your other Mac or iPhone can then see this one under “Play on” and play, pause, skip, browse this library and change the queue.
         </p>
         <h3>Device name</h3>
-        <input class="text" placeholder="Name shown to other devices" bind:value={s.remote.name} onchange={() => saveSettings(0)} />
+        <input class="text" placeholder={remote.name || "Name shown to other devices"} bind:value={s.remote.name} onchange={() => saveSettings(0)} />
         <p class="help">What other devices call this one. Leave empty to use the computer's name.</p>
+        {#if s.remote.allow}
+          <h3>Controlling this device now</h3>
+          {#if remote.controllers.length}
+            {#each remote.controllers as name, i (i)}<p class="ok">{name}</p>{/each}
+          {:else}
+            <p class="help">No one.</p>
+          {/if}
+        {/if}
       {:else if tab === "navidrome"}
         <h3>Server</h3>
         <input class="text" placeholder="Server address, e.g. https://music.example.com" bind:value={s.navidrome.url} onchange={() => saveSettings(0)} />
