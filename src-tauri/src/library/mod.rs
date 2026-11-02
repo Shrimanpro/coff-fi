@@ -2,6 +2,7 @@ pub mod covers;
 pub mod db;
 pub mod scan;
 pub mod tags;
+#[cfg(not(target_os = "ios"))]
 pub mod watch;
 
 use std::collections::{BTreeMap, HashMap};

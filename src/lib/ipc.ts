@@ -64,6 +64,7 @@ export const api = {
   search: (query: string) => invoke<SearchResults>("search", { query }),
   getTags: (id: number) => invoke<FileInfo>("get_tags", { id }),
   setTags: (id: number, tags: Tags) => invoke<Track>("set_tags", { id, tags }),
+  platform: () => invoke<"ios" | "macos" | "windows" | "linux">("get_platform"),
   setPlayMode: (mode: { shuffle?: boolean; repeat?: Repeat }) => invoke<void>("set_play_mode", { shuffle: mode.shuffle ?? null, repeat: mode.repeat ?? null }),
   remoteInfo: () => remoteApi.call<PlayMode & { name: string; platform: string }>("remote_info"),
   getSleep: () => invoke<SleepState>("get_sleep"),

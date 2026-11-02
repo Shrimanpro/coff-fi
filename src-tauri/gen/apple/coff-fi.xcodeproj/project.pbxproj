@@ -1,0 +1,582 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 77;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		0A56B45913A5989D4B7FB2A6 /* CoreAudio.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 25648F62078EDB68E389F8AA /* CoreAudio.framework */; };
+		331AF64B96A08B6FFE9BC7F6 /* WebKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 215259957CCABE4373AEA80D /* WebKit.framework */; };
+		467858494CAC5E8EC870F89F /* AVFoundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = FCE9499AE3E58DD1FA1DD886 /* AVFoundation.framework */; };
+		5C486D588AB9A8345D9E8C4A /* AudioToolbox.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = E0B3C5CA70D75C5E5AF57AD6 /* AudioToolbox.framework */; };
+		72464B33FE5C0DF3849C802F /* libapp.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 7EF7463D715DD6DBC0A85065 /* libapp.a */; };
+		7FD189C7792229C5626EBD4C /* CoreGraphics.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = CABA56FF3321BF1CFC47EC4F /* CoreGraphics.framework */; };
+		8B80B432BEEC2393649CDE0D /* assets in Resources */ = {isa = PBXBuildFile; fileRef = 924133B3EE4CEA56F617278A /* assets */; };
+		9398244AB96A5FA45A8B2027 /* Security.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 24362A8515B02F9954E96652 /* Security.framework */; };
+		9F3EF9AF5FEC4391A84D388C /* QuartzCore.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = F5C24EBE00D133CC30D45116 /* QuartzCore.framework */; };
+		BB00ABD0003E78B00E6BF70F /* Metal.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 5F35ECA50E2E1B7426B8D487 /* Metal.framework */; };
+		C3E4E379B1269B2A204ABB96 /* MetalKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 4C943084606DC33497598514 /* MetalKit.framework */; };
+		DA9B22778C81D6B671CFFB57 /* UIKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 5BE3AC4CFBF53BEFBF9D0095 /* UIKit.framework */; };
+		E05F327F27606E1CFBA3B2CF /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 4916C8A7AE79078FF4440706 /* Assets.xcassets */; };
+		EDEC1B614CEA8C6EB57C22F5 /* main.mm in Sources */ = {isa = PBXBuildFile; fileRef = 4EBE1EF68E8A024C79B64212 /* main.mm */; };
+		EF9BD38F4250A3E84E8A8B3D /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = F69FB1FCFE09D51FF6109B7D /* LaunchScreen.storyboard */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXFileReference section */
+		08C6F97E8A54C4BB9A495FB5 /* db.rs */ = {isa = PBXFileReference; path = db.rs; sourceTree = "<group>"; };
+		0F93E3D60E016C4F8AACBE1F /* lib.rs */ = {isa = PBXFileReference; path = lib.rs; sourceTree = "<group>"; };
+		13683ECF3631BEB7E23EFCCA /* mod.rs */ = {isa = PBXFileReference; path = mod.rs; sourceTree = "<group>"; };
+		1A3AED30466A87FEAFB1E238 /* client.rs */ = {isa = PBXFileReference; path = client.rs; sourceTree = "<group>"; };
+		1E5D8F46A21A09C34A8BB038 /* mod.rs */ = {isa = PBXFileReference; path = mod.rs; sourceTree = "<group>"; };
+		215259957CCABE4373AEA80D /* WebKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = WebKit.framework; path = System/Library/Frameworks/WebKit.framework; sourceTree = SDKROOT; };
+		24362A8515B02F9954E96652 /* Security.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Security.framework; path = System/Library/Frameworks/Security.framework; sourceTree = SDKROOT; };
+		25648F62078EDB68E389F8AA /* CoreAudio.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CoreAudio.framework; path = System/Library/Frameworks/CoreAudio.framework; sourceTree = SDKROOT; };
+		2CBE67C9F58329F1BE13D5EF /* navidrome.rs */ = {isa = PBXFileReference; path = navidrome.rs; sourceTree = "<group>"; };
+		35FB226B250D8877F1B331D6 /* parse.rs */ = {isa = PBXFileReference; path = parse.rs; sourceTree = "<group>"; };
+		4916C8A7AE79078FF4440706 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		4C943084606DC33497598514 /* MetalKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = MetalKit.framework; path = System/Library/Frameworks/MetalKit.framework; sourceTree = SDKROOT; };
+		4D2030BAA1185EF6ED280952 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
+		4DE8A5D642F6CA9F3615A4A8 /* mod.rs */ = {isa = PBXFileReference; path = mod.rs; sourceTree = "<group>"; };
+		4EBE1EF68E8A024C79B64212 /* main.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; path = main.mm; sourceTree = "<group>"; };
+		4EFF8502E5ABACC45F993B25 /* lrclib.rs */ = {isa = PBXFileReference; path = lrclib.rs; sourceTree = "<group>"; };
+		5BE3AC4CFBF53BEFBF9D0095 /* UIKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = UIKit.framework; path = System/Library/Frameworks/UIKit.framework; sourceTree = SDKROOT; };
+		5F35ECA50E2E1B7426B8D487 /* Metal.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Metal.framework; path = System/Library/Frameworks/Metal.framework; sourceTree = SDKROOT; };
+		721538A7899080A864DC5B59 /* tags.rs */ = {isa = PBXFileReference; path = tags.rs; sourceTree = "<group>"; };
+		7EF7463D715DD6DBC0A85065 /* libapp.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; path = libapp.a; sourceTree = "<group>"; };
+		8274403D0A54F8DAC2FD61A3 /* watch.rs */ = {isa = PBXFileReference; path = watch.rs; sourceTree = "<group>"; };
+		912415D7014546E0B9D7537D /* settings.rs */ = {isa = PBXFileReference; path = settings.rs; sourceTree = "<group>"; };
+		924133B3EE4CEA56F617278A /* assets */ = {isa = PBXFileReference; lastKnownFileType = folder; path = assets; sourceTree = SOURCE_ROOT; };
+		94870145BFBF8D86BAEAC36B /* mod.rs */ = {isa = PBXFileReference; path = mod.rs; sourceTree = "<group>"; };
+		9B031C444280FB2078965B8A /* output.rs */ = {isa = PBXFileReference; path = output.rs; sourceTree = "<group>"; };
+		9D6904E0C51542FA1A71EF6A /* bindings.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = bindings.h; sourceTree = "<group>"; };
+		AC7FBE9BEFD6572FA84BD868 /* scan.rs */ = {isa = PBXFileReference; path = scan.rs; sourceTree = "<group>"; };
+		B2714946FFC8AC6C7C2F8551 /* lastfm.rs */ = {isa = PBXFileReference; path = lastfm.rs; sourceTree = "<group>"; };
+		B65B11DE01467D50106B5ACC /* bonjour.rs */ = {isa = PBXFileReference; path = bonjour.rs; sourceTree = "<group>"; };
+		BA402E6F2DB032E66CFFDA69 /* server.rs */ = {isa = PBXFileReference; path = server.rs; sourceTree = "<group>"; };
+		BC0EAF2412987D7F4160E67D /* matching.rs */ = {isa = PBXFileReference; path = matching.rs; sourceTree = "<group>"; };
+		C1AEED9832A81EF09262DFEA /* dispatch.rs */ = {isa = PBXFileReference; path = dispatch.rs; sourceTree = "<group>"; };
+		C49F6D63F7082F5C9335DB00 /* queue.rs */ = {isa = PBXFileReference; path = queue.rs; sourceTree = "<group>"; };
+		CABA56FF3321BF1CFC47EC4F /* CoreGraphics.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CoreGraphics.framework; path = System/Library/Frameworks/CoreGraphics.framework; sourceTree = SDKROOT; };
+		CC8CCF80BAE6546CAC6C4179 /* mod.rs */ = {isa = PBXFileReference; path = mod.rs; sourceTree = "<group>"; };
+		DF183C4332CAA765EBD4D7B5 /* coff-fi_iOS.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = "coff-fi_iOS.entitlements"; sourceTree = "<group>"; };
+		E0B3C5CA70D75C5E5AF57AD6 /* AudioToolbox.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = AudioToolbox.framework; path = System/Library/Frameworks/AudioToolbox.framework; sourceTree = SDKROOT; };
+		E15B08620A742D63CC7BDF1B /* main.rs */ = {isa = PBXFileReference; path = main.rs; sourceTree = "<group>"; };
+		E165F126CC7AFFD6F92A7F18 /* covers.rs */ = {isa = PBXFileReference; path = covers.rs; sourceTree = "<group>"; };
+		EC5F49460C65E475B17862F5 /* eq.rs */ = {isa = PBXFileReference; path = eq.rs; sourceTree = "<group>"; };
+		F5C24EBE00D133CC30D45116 /* QuartzCore.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = QuartzCore.framework; path = System/Library/Frameworks/QuartzCore.framework; sourceTree = SDKROOT; };
+		F69FB1FCFE09D51FF6109B7D /* LaunchScreen.storyboard */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; path = LaunchScreen.storyboard; sourceTree = "<group>"; };
+		F8CD1CCD1D733840FA4D0974 /* decoder.rs */ = {isa = PBXFileReference; path = decoder.rs; sourceTree = "<group>"; };
+		F9360C462066B2E75568FD03 /* coff-fi_iOS.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = "coff-fi_iOS.app"; sourceTree = BUILT_PRODUCTS_DIR; };
+		FCE9499AE3E58DD1FA1DD886 /* AVFoundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = AVFoundation.framework; path = System/Library/Frameworks/AVFoundation.framework; sourceTree = SDKROOT; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		68AC5A8C313BDAE79F248375 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				72464B33FE5C0DF3849C802F /* libapp.a in Frameworks */,
+				7FD189C7792229C5626EBD4C /* CoreGraphics.framework in Frameworks */,
+				BB00ABD0003E78B00E6BF70F /* Metal.framework in Frameworks */,
+				C3E4E379B1269B2A204ABB96 /* MetalKit.framework in Frameworks */,
+				9F3EF9AF5FEC4391A84D388C /* QuartzCore.framework in Frameworks */,
+				9398244AB96A5FA45A8B2027 /* Security.framework in Frameworks */,
+				DA9B22778C81D6B671CFFB57 /* UIKit.framework in Frameworks */,
+				331AF64B96A08B6FFE9BC7F6 /* WebKit.framework in Frameworks */,
+				467858494CAC5E8EC870F89F /* AVFoundation.framework in Frameworks */,
+				5C486D588AB9A8345D9E8C4A /* AudioToolbox.framework in Frameworks */,
+				0A56B45913A5989D4B7FB2A6 /* CoreAudio.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		0A5714C8287790E473121164 /* coff-fi_iOS */ = {
+			isa = PBXGroup;
+			children = (
+				DF183C4332CAA765EBD4D7B5 /* coff-fi_iOS.entitlements */,
+				4D2030BAA1185EF6ED280952 /* Info.plist */,
+			);
+			path = "coff-fi_iOS";
+			sourceTree = "<group>";
+		};
+		0B036B92832167CD699B46A9 /* audio */ = {
+			isa = PBXGroup;
+			children = (
+				F8CD1CCD1D733840FA4D0974 /* decoder.rs */,
+				EC5F49460C65E475B17862F5 /* eq.rs */,
+				94870145BFBF8D86BAEAC36B /* mod.rs */,
+				9B031C444280FB2078965B8A /* output.rs */,
+			);
+			path = audio;
+			sourceTree = "<group>";
+		};
+		15EAAF3045B8FAF0FE019858 /* lyrics */ = {
+			isa = PBXGroup;
+			children = (
+				4EFF8502E5ABACC45F993B25 /* lrclib.rs */,
+				BC0EAF2412987D7F4160E67D /* matching.rs */,
+				13683ECF3631BEB7E23EFCCA /* mod.rs */,
+				35FB226B250D8877F1B331D6 /* parse.rs */,
+			);
+			path = lyrics;
+			sourceTree = "<group>";
+		};
+		2A1D7D2E94B34FB5F140FBED /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+				E0B3C5CA70D75C5E5AF57AD6 /* AudioToolbox.framework */,
+				FCE9499AE3E58DD1FA1DD886 /* AVFoundation.framework */,
+				25648F62078EDB68E389F8AA /* CoreAudio.framework */,
+				CABA56FF3321BF1CFC47EC4F /* CoreGraphics.framework */,
+				7EF7463D715DD6DBC0A85065 /* libapp.a */,
+				5F35ECA50E2E1B7426B8D487 /* Metal.framework */,
+				4C943084606DC33497598514 /* MetalKit.framework */,
+				F5C24EBE00D133CC30D45116 /* QuartzCore.framework */,
+				24362A8515B02F9954E96652 /* Security.framework */,
+				5BE3AC4CFBF53BEFBF9D0095 /* UIKit.framework */,
+				215259957CCABE4373AEA80D /* WebKit.framework */,
+			);
+			name = Frameworks;
+			sourceTree = "<group>";
+		};
+		2F1DB6C54C2663C6AE1ABCE2 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				F9360C462066B2E75568FD03 /* coff-fi_iOS.app */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		306733172D4905817906D0C4 /* coff-fi */ = {
+			isa = PBXGroup;
+			children = (
+				4EBE1EF68E8A024C79B64212 /* main.mm */,
+				3322F13CB2BBBF7F45E1D363 /* bindings */,
+			);
+			path = "coff-fi";
+			sourceTree = "<group>";
+		};
+		3322F13CB2BBBF7F45E1D363 /* bindings */ = {
+			isa = PBXGroup;
+			children = (
+				9D6904E0C51542FA1A71EF6A /* bindings.h */,
+			);
+			path = bindings;
+			sourceTree = "<group>";
+		};
+		3E4EC4ED75FA91B726F3E033 /* src */ = {
+			isa = PBXGroup;
+			children = (
+				0F93E3D60E016C4F8AACBE1F /* lib.rs */,
+				E15B08620A742D63CC7BDF1B /* main.rs */,
+				2CBE67C9F58329F1BE13D5EF /* navidrome.rs */,
+				C49F6D63F7082F5C9335DB00 /* queue.rs */,
+				912415D7014546E0B9D7537D /* settings.rs */,
+				0B036B92832167CD699B46A9 /* audio */,
+				53C66D2F8592C81A98401C61 /* integrations */,
+				B83F7BBCC272C8137A0EEFD5 /* library */,
+				15EAAF3045B8FAF0FE019858 /* lyrics */,
+				C3EF0859C1FAF4223E3D740D /* remote */,
+			);
+			name = src;
+			path = ../../src;
+			sourceTree = "<group>";
+		};
+		53C66D2F8592C81A98401C61 /* integrations */ = {
+			isa = PBXGroup;
+			children = (
+				B2714946FFC8AC6C7C2F8551 /* lastfm.rs */,
+				1E5D8F46A21A09C34A8BB038 /* mod.rs */,
+			);
+			path = integrations;
+			sourceTree = "<group>";
+		};
+		B83F7BBCC272C8137A0EEFD5 /* library */ = {
+			isa = PBXGroup;
+			children = (
+				E165F126CC7AFFD6F92A7F18 /* covers.rs */,
+				08C6F97E8A54C4BB9A495FB5 /* db.rs */,
+				CC8CCF80BAE6546CAC6C4179 /* mod.rs */,
+				AC7FBE9BEFD6572FA84BD868 /* scan.rs */,
+				721538A7899080A864DC5B59 /* tags.rs */,
+				8274403D0A54F8DAC2FD61A3 /* watch.rs */,
+			);
+			path = library;
+			sourceTree = "<group>";
+		};
+		BC3AB4D7AE3A986A50F2B18B /* Externals */ = {
+			isa = PBXGroup;
+			children = (
+			);
+			path = Externals;
+			sourceTree = "<group>";
+		};
+		C3EF0859C1FAF4223E3D740D /* remote */ = {
+			isa = PBXGroup;
+			children = (
+				B65B11DE01467D50106B5ACC /* bonjour.rs */,
+				1A3AED30466A87FEAFB1E238 /* client.rs */,
+				C1AEED9832A81EF09262DFEA /* dispatch.rs */,
+				4DE8A5D642F6CA9F3615A4A8 /* mod.rs */,
+				BA402E6F2DB032E66CFFDA69 /* server.rs */,
+			);
+			path = remote;
+			sourceTree = "<group>";
+		};
+		CB4DAE155343862375AB5985 /* Sources */ = {
+			isa = PBXGroup;
+			children = (
+				306733172D4905817906D0C4 /* coff-fi */,
+			);
+			path = Sources;
+			sourceTree = "<group>";
+		};
+		E25CF094FF31BF470AF1834B = {
+			isa = PBXGroup;
+			children = (
+				924133B3EE4CEA56F617278A /* assets */,
+				4916C8A7AE79078FF4440706 /* Assets.xcassets */,
+				F69FB1FCFE09D51FF6109B7D /* LaunchScreen.storyboard */,
+				0A5714C8287790E473121164 /* coff-fi_iOS */,
+				BC3AB4D7AE3A986A50F2B18B /* Externals */,
+				CB4DAE155343862375AB5985 /* Sources */,
+				3E4EC4ED75FA91B726F3E033 /* src */,
+				2A1D7D2E94B34FB5F140FBED /* Frameworks */,
+				2F1DB6C54C2663C6AE1ABCE2 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		"TEMP_75031BC7-3E50-47BD-B52F-E0F7E15B8045" /* arm64 */ = {
+			isa = PBXGroup;
+			children = (
+			);
+			path = arm64;
+			sourceTree = "<group>";
+		};
+		"TEMP_F0C8DD65-4398-4D69-B7C0-E5F2190B6508" /* x86_64 */ = {
+			isa = PBXGroup;
+			children = (
+			);
+			path = x86_64;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		4553618FF42F7D9B7149FA45 /* coff-fi_iOS */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = FB2F5EEA918B2C62B7030679 /* Build configuration list for PBXNativeTarget "coff-fi_iOS" */;
+			buildPhases = (
+				0B8D1A1DFA30BE06E61E5A3A /* Build Rust Code */,
+				DEE9A202FCA55D902AF3800F /* Sources */,
+				55E88C08A7D44F44AB7D8A2D /* Resources */,
+				68AC5A8C313BDAE79F248375 /* Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = "coff-fi_iOS";
+			packageProductDependencies = (
+			);
+			productName = "coff-fi_iOS";
+			productReference = F9360C462066B2E75568FD03 /* coff-fi_iOS.app */;
+			productType = "com.apple.product-type.application";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		C2D84BEA8AFE7CDA415DE7EB /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = YES;
+				LastUpgradeCheck = 1430;
+				TargetAttributes = {
+				};
+			};
+			buildConfigurationList = 3120082FF8F4AC691F5E7125 /* Build configuration list for PBXProject "coff-fi" */;
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				Base,
+				en,
+			);
+			mainGroup = E25CF094FF31BF470AF1834B;
+			minimizedProjectReferenceProxies = 1;
+			preferredProjectObjectVersion = 77;
+			productRefGroup = 2F1DB6C54C2663C6AE1ABCE2 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				4553618FF42F7D9B7149FA45 /* coff-fi_iOS */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		55E88C08A7D44F44AB7D8A2D /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				E05F327F27606E1CFBA3B2CF /* Assets.xcassets in Resources */,
+				EF9BD38F4250A3E84E8A8B3D /* LaunchScreen.storyboard in Resources */,
+				8B80B432BEEC2393649CDE0D /* assets in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXShellScriptBuildPhase section */
+		0B8D1A1DFA30BE06E61E5A3A /* Build Rust Code */ = {
+			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+			);
+			name = "Build Rust Code";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+				"$(SRCROOT)/Externals/x86_64/${CONFIGURATION}/libapp.a",
+				"$(SRCROOT)/Externals/arm64/${CONFIGURATION}/libapp.a",
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "# Xcode doesn't inherit the shell PATH; make Homebrew's node/npm and cargo findable.\nexport PATH=\"/opt/homebrew/bin:/usr/local/bin:$HOME/.cargo/bin:$PATH\"\nnpm run -- tauri ios xcode-script -v --platform \"${PLATFORM_DISPLAY_NAME:?}\" --sdk-root \"${SDKROOT:?}\" --framework-search-paths \"${FRAMEWORK_SEARCH_PATHS:?}\" --header-search-paths \"${HEADER_SEARCH_PATHS:?}\" --gcc-preprocessor-definitions \"${GCC_PREPROCESSOR_DEFINITIONS:-}\" --configuration \"${CONFIGURATION:?}\" ${FORCE_COLOR} ${ARCHS:?}\n";
+		};
+/* End PBXShellScriptBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		DEE9A202FCA55D902AF3800F /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				EDEC1B614CEA8C6EB57C22F5 /* main.mm in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin XCBuildConfiguration section */
+		1A969ED96AF73235A58B6688 /* debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"$(inherited)",
+					"DEBUG=1",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 5.0;
+			};
+			name = debug;
+		};
+		6F09C2E0F4EB2F839FC5336E /* debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES = YES;
+				ARCHS = (
+					arm64,
+				);
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = "coff-fi_iOS/coff-fi_iOS.entitlements";
+				CODE_SIGN_IDENTITY = "iPhone Developer";
+				ENABLE_BITCODE = NO;
+				"EXCLUDED_ARCHS[sdk=iphoneos*]" = x86_64;
+				FRAMEWORK_SEARCH_PATHS = (
+					"$(inherited)",
+					"\".\"",
+				);
+				INFOPLIST_FILE = "coff-fi_iOS/Info.plist";
+				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				"LIBRARY_SEARCH_PATHS[arch=arm64]" = "$(inherited) $(PROJECT_DIR)/Externals/arm64/$(CONFIGURATION) $(SDKROOT)/usr/lib/swift $(DEVELOPER_DIR)/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/$(PLATFORM_NAME) $(DEVELOPER_DIR)/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift-5.0/$(PLATFORM_NAME)";
+				"LIBRARY_SEARCH_PATHS[arch=x86_64]" = "$(inherited) $(PROJECT_DIR)/Externals/x86_64/$(CONFIGURATION) $(SDKROOT)/usr/lib/swift $(DEVELOPER_DIR)/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/$(PLATFORM_NAME) $(DEVELOPER_DIR)/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift-5.0/$(PLATFORM_NAME)";
+				PRODUCT_BUNDLE_IDENTIFIER = app.coffi.player;
+				PRODUCT_NAME = "Coff-fi";
+				SDKROOT = iphoneos;
+				SWIFT_STRICT_CONCURRENCY = minimal;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 1;
+				VALID_ARCHS = arm64;
+				DEVELOPMENT_TEAM = "";
+			};
+			name = debug;
+		};
+		C444F3CAF445259E77B63F1F /* release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				SWIFT_VERSION = 5.0;
+			};
+			name = release;
+		};
+		E1AF5F1C17DC6872A257AED2 /* release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES = YES;
+				ARCHS = (
+					arm64,
+				);
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = "coff-fi_iOS/coff-fi_iOS.entitlements";
+				CODE_SIGN_IDENTITY = "iPhone Developer";
+				ENABLE_BITCODE = NO;
+				"EXCLUDED_ARCHS[sdk=iphoneos*]" = x86_64;
+				FRAMEWORK_SEARCH_PATHS = (
+					"$(inherited)",
+					"\".\"",
+				);
+				INFOPLIST_FILE = "coff-fi_iOS/Info.plist";
+				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				"LIBRARY_SEARCH_PATHS[arch=arm64]" = "$(inherited) $(PROJECT_DIR)/Externals/arm64/$(CONFIGURATION) $(SDKROOT)/usr/lib/swift $(DEVELOPER_DIR)/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/$(PLATFORM_NAME) $(DEVELOPER_DIR)/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift-5.0/$(PLATFORM_NAME)";
+				"LIBRARY_SEARCH_PATHS[arch=x86_64]" = "$(inherited) $(PROJECT_DIR)/Externals/x86_64/$(CONFIGURATION) $(SDKROOT)/usr/lib/swift $(DEVELOPER_DIR)/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/$(PLATFORM_NAME) $(DEVELOPER_DIR)/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift-5.0/$(PLATFORM_NAME)";
+				PRODUCT_BUNDLE_IDENTIFIER = app.coffi.player;
+				PRODUCT_NAME = "Coff-fi";
+				SDKROOT = iphoneos;
+				SWIFT_STRICT_CONCURRENCY = minimal;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 1;
+				VALID_ARCHS = arm64;
+				DEVELOPMENT_TEAM = "";
+			};
+			name = release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		3120082FF8F4AC691F5E7125 /* Build configuration list for PBXProject "coff-fi" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				1A969ED96AF73235A58B6688 /* debug */,
+				C444F3CAF445259E77B63F1F /* release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = debug;
+		};
+		FB2F5EEA918B2C62B7030679 /* Build configuration list for PBXNativeTarget "coff-fi_iOS" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				6F09C2E0F4EB2F839FC5336E /* debug */,
+				E1AF5F1C17DC6872A257AED2 /* release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = debug;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = C2D84BEA8AFE7CDA415DE7EB /* Project object */;
+}

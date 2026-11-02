@@ -25,7 +25,11 @@ use settings::{Navidrome, Repeat, Settings};
 
 type Res<T> = Result<T, String>;
 
+#[cfg(not(target_os = "ios"))]
 type Watcher = library::watch::Watcher;
+/// iOS has no file watcher; the library is rescanned when the app comes to the foreground.
+#[cfg(target_os = "ios")]
+type Watcher = ();
 
 fn err(e: impl std::fmt::Display) -> String {
     e.to_string()
@@ -43,6 +47,7 @@ pub struct AppState {
     player: Player,
     integrations: Integrations,
     random: RwLock<Vec<i64>>,
+    #[cfg_attr(target_os = "ios", allow(dead_code))]
     watcher: Mutex<Option<Watcher>>,
     scanning: AtomicBool,
     rescan_pending: AtomicBool,
@@ -371,6 +376,10 @@ fn rescan_now(app: &AppHandle) {
     });
 }
 
+#[cfg(target_os = "ios")]
+fn start_watcher(_app: &AppHandle, _st: &AppState) {}
+
+#[cfg(not(target_os = "ios"))]
 fn start_watcher(app: &AppHandle, st: &AppState) {
     let s = st.settings.read().clone();
     let mut w = st.watcher.lock();
@@ -868,6 +877,7 @@ fn on_control(app: &AppHandle, c: Control) {
 
 // ---------- platform & iOS extras ----------
 
+#[tauri::command]
 fn get_platform() -> &'static str {
     if cfg!(target_os = "ios") {
         "ios"
@@ -942,6 +952,17 @@ pub fn run() {
                 s.remote.id = format!("{:016x}", xxhash_rust::xxh3::xxh3_64(seed.as_bytes()));
                 save_settings(conn, &s).map_err(anyhow::Error::msg)?;
             }
+            // iOS: the app's own Documents folder (visible in the Files app) is the default library.
+            #[cfg(target_os = "ios")]
+            if s.roots.is_empty() {
+                if let Ok(docs) = app.path().document_dir() {
+                    let music = docs.join("Music");
+                    let _ = std::fs::create_dir_all(&music);
+                    s.roots.push(music.to_string_lossy().into_owned());
+                    save_settings(conn, &s).map_err(anyhow::Error::msg)?;
+                }
+            }
+            #[cfg(not(target_os = "ios"))]
             if s.roots.is_empty() {
                 if let Ok(music) = app.path().audio_dir() {
                     if music.is_dir() {
@@ -993,6 +1014,18 @@ pub fn run() {
             start_watcher(app.handle(), &st);
             rescan_now(app.handle());
             remote::init(app.handle());
+            // Debug builds only: COFFI_EVAL=<js> runs a script in the webview after launch, to drive
+            // the UI in the simulator (e.g. `SIMCTL_CHILD_COFFI_EVAL=... xcrun simctl launch`).
+            #[cfg(debug_assertions)]
+            if let Ok(js) = std::env::var("COFFI_EVAL") {
+                let h = app.handle().clone();
+                std::thread::spawn(move || {
+                    std::thread::sleep(std::time::Duration::from_secs(5));
+                    if let Some(w) = h.get_webview_window("main") {
+                        let _ = w.eval(&js);
+                    }
+                });
+            }
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -1025,6 +1058,7 @@ pub fn run() {
             set_source,
             get_tags,
             set_tags,
+            get_platform,
             get_sleep,
             sleep_timer,
             set_play_mode,

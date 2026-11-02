@@ -5,19 +5,32 @@ pub mod lastfm;
 
 use std::collections::HashMap;
 use std::path::PathBuf;
+#[cfg(not(target_os = "ios"))]
 use std::time::Duration;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use crossbeam_channel::{unbounded, Sender};
+#[cfg(not(target_os = "ios"))]
 use discord_rich_presence::activity::{self, ActivityType, StatusDisplayType};
+#[cfg(not(target_os = "ios"))]
 use discord_rich_presence::{DiscordIpc, DiscordIpcClient};
 use serde_json::Value;
+#[cfg(not(target_os = "ios"))]
 use souvlaki::{MediaControlEvent, MediaControls, MediaMetadata, MediaPlayback, MediaPosition, PlatformConfig, SeekDirection};
+
+/// On iOS the lock screen / Dynamic Island controls live in the native Swift layer, and
+/// there's no Discord client to talk to.
+#[cfg(target_os = "ios")]
+struct MediaControls;
+#[cfg(target_os = "ios")]
+#[allow(dead_code)]
+struct DiscordIpcClient;
 
 use crate::library::db::now;
 use crate::settings::Settings;
 
 /// Coff-fi's own Discord application, so users only need to flip the toggle.
+#[cfg(not(target_os = "ios"))]
 const DISCORD_APP_ID: &str = "1567060675333722172";
 
 #[derive(Clone, Debug)]
@@ -35,16 +48,19 @@ pub enum Msg {
     Played,
     Config(Box<Settings>),
     /// Result of a background cover-art lookup for Discord (keyed by `art_key`).
+    #[cfg_attr(target_os = "ios", allow(dead_code))]
     Art(String, Option<String>),
 }
 
 /// Discord can only show artwork from a public URL, so local covers are matched
 /// against the iTunes catalogue (keyless) and cached per album for the session.
+#[cfg_attr(target_os = "ios", allow(dead_code))]
 fn art_key(t: &NowPlaying) -> String {
     let what = if t.album.is_empty() { &t.title } else { &t.album };
     format!("{}\u{1f}{}", t.artist, what).to_lowercase()
 }
 
+#[cfg_attr(target_os = "ios", allow(dead_code))]
 fn lookup_art(t: &NowPlaying) -> Option<String> {
     let (term, entity) = if t.album.is_empty() { (&t.title, "song") } else { (&t.album, "album") };
     let url = format!(
@@ -56,6 +72,7 @@ fn lookup_art(t: &NowPlaying) -> Option<String> {
     Some(art.replace("100x100bb", "512x512bb"))
 }
 
+#[cfg_attr(target_os = "ios", allow(dead_code))]
 fn now_ms() -> i64 {
     SystemTime::now().duration_since(UNIX_EPOCH).map(|d| d.as_millis() as i64).unwrap_or(0)
 }
@@ -98,6 +115,11 @@ pub fn spawn(settings: Settings, hwnd: Option<isize>, on_control: impl Fn(Contro
             let mut position = 0.0;
             let mut art: HashMap<String, Option<String>> = HashMap::new();
 
+            #[cfg(target_os = "ios")]
+            let _ = hwnd;
+            #[cfg(target_os = "ios")]
+            let make_controls = |_: &Settings| -> Option<MediaControls> { None };
+            #[cfg(not(target_os = "ios"))]
             let make_controls = |cfg: &Settings| -> Option<MediaControls> {
                 if !cfg.media_controls {
                     return None;
@@ -131,6 +153,9 @@ pub fn spawn(settings: Settings, hwnd: Option<isize>, on_control: impl Fn(Contro
             };
             controls = make_controls(&cfg).or(controls);
 
+            #[cfg(target_os = "ios")]
+            let connect_discord = |_: &Settings| -> Option<DiscordIpcClient> { None };
+            #[cfg(not(target_os = "ios"))]
             let connect_discord = |cfg: &Settings| -> Option<DiscordIpcClient> {
                 if !cfg.discord.enabled {
                     return None;
@@ -148,6 +173,7 @@ pub fn spawn(settings: Settings, hwnd: Option<isize>, on_control: impl Fn(Contro
                     Msg::Track(np) => {
                         track = np;
                         started = now();
+                        #[cfg(not(target_os = "ios"))]
                         if let Some(c) = &mut controls {
                             match &track {
                                 Some(t) => {
@@ -181,6 +207,7 @@ pub fn spawn(settings: Settings, hwnd: Option<isize>, on_control: impl Fn(Contro
                         if !changed {
                             continue;
                         }
+                        #[cfg(not(target_os = "ios"))]
                         if let Some(c) = &mut controls {
                             let progress = Some(MediaPosition(Duration::from_secs_f64(pos.max(0.0))));
                             let _ = c.set_playback(if track.is_none() {
@@ -204,6 +231,7 @@ pub fn spawn(settings: Settings, hwnd: Option<isize>, on_control: impl Fn(Contro
                         if s.media_controls != cfg.media_controls {
                             controls = if s.media_controls { make_controls(&s) } else { None };
                         }
+                        #[cfg(not(target_os = "ios"))]
                         if s.discord != cfg.discord {
                             if let Some(mut d) = discord.take() {
                                 let _ = d.close();
@@ -220,6 +248,9 @@ pub fn spawn(settings: Settings, hwnd: Option<isize>, on_control: impl Fn(Contro
                         }
                     }
                 }
+                #[cfg(target_os = "ios")]
+                let _ = (&mut discord, &art_tx, &mut art, started, playing, position);
+                #[cfg(not(target_os = "ios"))]
                 if let Some(d) = &mut discord {
                     let ok = match (&track, playing) {
                         (Some(t), true) => {
