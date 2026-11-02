@@ -28,12 +28,17 @@ pub struct Device {
 }
 
 struct Host {
+    /// Tells a dead server's `on_dead` apart from the current one's.
+    generation: u64,
     server: server::Server,
     reg: Option<bonjour::Registration>,
     advertised: String,
 }
 
 static HOST: Mutex<Option<Host>> = Mutex::new(None);
+static GENERATION: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+/// A server is being started (so two quick `apply` calls don't start two).
+static STARTING: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
 static BROWSER: Mutex<Option<bonjour::Browser>> = Mutex::new(None);
 static DEVICES: Mutex<Vec<Device>> = Mutex::new(Vec::new());
 /// The OS's name for this device (iOS hands it over at launch).
@@ -115,18 +120,27 @@ pub fn apply(app: &AppHandle) {
             return;
         }
     }
+    if STARTING.swap(true, std::sync::atomic::Ordering::AcqRel) {
+        return;
+    }
     let app = app.clone();
     tauri::async_runtime::spawn(async move {
+        let generation = GENERATION.fetch_add(1, std::sync::atomic::Ordering::Relaxed) + 1;
         match server::start(app.clone()).await {
             Ok(server) => {
                 let reg = advertise(&app, &name, server.port);
                 let mut host = HOST.lock();
                 // Sharing may have been switched off while the server was starting.
                 if app.state::<AppState>().settings.read().remote.allow && host.is_none() {
-                    *host = Some(Host { server, reg, advertised: name });
+                    *host = Some(Host { generation, server, reg, advertised: name });
                 }
             }
             Err(e) => eprintln!("remote: can't start server: {e}"),
+        }
+        STARTING.store(false, std::sync::atomic::Ordering::Release);
+        // Settings may have changed while starting (e.g. sharing switched off, then on again).
+        if HOST.lock().is_none() && app.state::<AppState>().settings.read().remote.allow {
+            apply(&app);
         }
     });
 }
