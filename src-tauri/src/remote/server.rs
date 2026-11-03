@@ -95,8 +95,9 @@ fn transient(e: &std::io::Error) -> bool {
         || matches!(e.raw_os_error(), Some(libc::EMFILE | libc::ENFILE | libc::ENOBUFS | libc::ENOMEM))
 }
 
-/// Starts listening.
-pub async fn start(app: AppHandle) -> std::io::Result<Server> {
+/// Starts listening. `on_dead` runs if the listening socket stops working, which iOS does to
+/// every listening socket of an app it suspends ("defuncting"); the caller then starts over.
+pub async fn start(app: AppHandle, on_dead: impl FnOnce() + Send + 'static) -> std::io::Result<Server> {
     let listener = bind().await?;
     let port = listener.local_addr()?.port();
     let a = app.clone();
@@ -123,6 +124,7 @@ pub async fn start(app: AppHandle) -> std::io::Result<Server> {
                 }
             }
         }
+        on_dead();
     });
     Ok(Server { port, accept: accept.inner().abort_handle(), app })
 }

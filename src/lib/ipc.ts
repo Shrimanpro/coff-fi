@@ -67,6 +67,8 @@ export const api = {
   platform: () => invoke<"ios" | "macos" | "windows" | "linux">("get_platform"),
   setPlayMode: (mode: { shuffle?: boolean; repeat?: Repeat }) => invoke<void>("set_play_mode", { shuffle: mode.shuffle ?? null, repeat: mode.repeat ?? null }),
   remoteInfo: () => remoteApi.call<PlayMode & { name: string; platform: string }>("remote_info"),
+  /** iOS only: "airplay" (route picker), "pick_folder" / "pick_exclude" (Files app). */
+  nativeRequest: (what: string) => invoke<void>("native_request", { what }),
   getSleep: () => invoke<SleepState>("get_sleep"),
   sleepTimer: (mode: SleepState["mode"], minutes?: number) => invoke<SleepState>("sleep_timer", { mode, minutes }),
 };

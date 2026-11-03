@@ -16,20 +16,25 @@
 		8B80B432BEEC2393649CDE0D /* assets in Resources */ = {isa = PBXBuildFile; fileRef = 924133B3EE4CEA56F617278A /* assets */; };
 		9398244AB96A5FA45A8B2027 /* Security.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 24362A8515B02F9954E96652 /* Security.framework */; };
 		9F3EF9AF5FEC4391A84D388C /* QuartzCore.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = F5C24EBE00D133CC30D45116 /* QuartzCore.framework */; };
+		B747C26F170C92E78DF2D0B3 /* CoffiNative.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A49ECB8B1F4F44C636DD760 /* CoffiNative.swift */; };
 		BB00ABD0003E78B00E6BF70F /* Metal.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 5F35ECA50E2E1B7426B8D487 /* Metal.framework */; };
 		C3E4E379B1269B2A204ABB96 /* MetalKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 4C943084606DC33497598514 /* MetalKit.framework */; };
 		DA9B22778C81D6B671CFFB57 /* UIKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 5BE3AC4CFBF53BEFBF9D0095 /* UIKit.framework */; };
 		E05F327F27606E1CFBA3B2CF /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 4916C8A7AE79078FF4440706 /* Assets.xcassets */; };
+		E4D4A98EC43BCEC591638927 /* MediaPlayer.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 1F14FB0AC305D91A3A4B2C8A /* MediaPlayer.framework */; };
 		EDEC1B614CEA8C6EB57C22F5 /* main.mm in Sources */ = {isa = PBXBuildFile; fileRef = 4EBE1EF68E8A024C79B64212 /* main.mm */; };
 		EF9BD38F4250A3E84E8A8B3D /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = F69FB1FCFE09D51FF6109B7D /* LaunchScreen.storyboard */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
 		08C6F97E8A54C4BB9A495FB5 /* db.rs */ = {isa = PBXFileReference; path = db.rs; sourceTree = "<group>"; };
+		0A49ECB8B1F4F44C636DD760 /* CoffiNative.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CoffiNative.swift; sourceTree = "<group>"; };
 		0F93E3D60E016C4F8AACBE1F /* lib.rs */ = {isa = PBXFileReference; path = lib.rs; sourceTree = "<group>"; };
 		13683ECF3631BEB7E23EFCCA /* mod.rs */ = {isa = PBXFileReference; path = mod.rs; sourceTree = "<group>"; };
+		143834D80A888140861C9412 /* CoffiBridge.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = CoffiBridge.h; sourceTree = "<group>"; };
 		1A3AED30466A87FEAFB1E238 /* client.rs */ = {isa = PBXFileReference; path = client.rs; sourceTree = "<group>"; };
 		1E5D8F46A21A09C34A8BB038 /* mod.rs */ = {isa = PBXFileReference; path = mod.rs; sourceTree = "<group>"; };
+		1F14FB0AC305D91A3A4B2C8A /* MediaPlayer.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = MediaPlayer.framework; path = System/Library/Frameworks/MediaPlayer.framework; sourceTree = SDKROOT; };
 		215259957CCABE4373AEA80D /* WebKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = WebKit.framework; path = System/Library/Frameworks/WebKit.framework; sourceTree = SDKROOT; };
 		24362A8515B02F9954E96652 /* Security.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Security.framework; path = System/Library/Frameworks/Security.framework; sourceTree = SDKROOT; };
 		25648F62078EDB68E389F8AA /* CoreAudio.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CoreAudio.framework; path = System/Library/Frameworks/CoreAudio.framework; sourceTree = SDKROOT; };
@@ -67,6 +72,7 @@
 		EC5F49460C65E475B17862F5 /* eq.rs */ = {isa = PBXFileReference; path = eq.rs; sourceTree = "<group>"; };
 		F5C24EBE00D133CC30D45116 /* QuartzCore.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = QuartzCore.framework; path = System/Library/Frameworks/QuartzCore.framework; sourceTree = SDKROOT; };
 		F69FB1FCFE09D51FF6109B7D /* LaunchScreen.storyboard */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; path = LaunchScreen.storyboard; sourceTree = "<group>"; };
+		F6E52BD1AD398E4306E7514A /* native.rs */ = {isa = PBXFileReference; path = native.rs; sourceTree = "<group>"; };
 		F8CD1CCD1D733840FA4D0974 /* decoder.rs */ = {isa = PBXFileReference; path = decoder.rs; sourceTree = "<group>"; };
 		F9360C462066B2E75568FD03 /* coff-fi_iOS.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = "coff-fi_iOS.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 		FCE9499AE3E58DD1FA1DD886 /* AVFoundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = AVFoundation.framework; path = System/Library/Frameworks/AVFoundation.framework; sourceTree = SDKROOT; };
@@ -86,6 +92,7 @@
 				DA9B22778C81D6B671CFFB57 /* UIKit.framework in Frameworks */,
 				331AF64B96A08B6FFE9BC7F6 /* WebKit.framework in Frameworks */,
 				467858494CAC5E8EC870F89F /* AVFoundation.framework in Frameworks */,
+				E4D4A98EC43BCEC591638927 /* MediaPlayer.framework in Frameworks */,
 				5C486D588AB9A8345D9E8C4A /* AudioToolbox.framework in Frameworks */,
 				0A56B45913A5989D4B7FB2A6 /* CoreAudio.framework in Frameworks */,
 			);
@@ -133,6 +140,7 @@
 				25648F62078EDB68E389F8AA /* CoreAudio.framework */,
 				CABA56FF3321BF1CFC47EC4F /* CoreGraphics.framework */,
 				7EF7463D715DD6DBC0A85065 /* libapp.a */,
+				1F14FB0AC305D91A3A4B2C8A /* MediaPlayer.framework */,
 				5F35ECA50E2E1B7426B8D487 /* Metal.framework */,
 				4C943084606DC33497598514 /* MetalKit.framework */,
 				F5C24EBE00D133CC30D45116 /* QuartzCore.framework */,
@@ -156,6 +164,7 @@
 			children = (
 				4EBE1EF68E8A024C79B64212 /* main.mm */,
 				3322F13CB2BBBF7F45E1D363 /* bindings */,
+				4AF7BD6FA3A2354DC24E2669 /* Native */,
 			);
 			path = "coff-fi";
 			sourceTree = "<group>";
@@ -173,6 +182,7 @@
 			children = (
 				0F93E3D60E016C4F8AACBE1F /* lib.rs */,
 				E15B08620A742D63CC7BDF1B /* main.rs */,
+				F6E52BD1AD398E4306E7514A /* native.rs */,
 				2CBE67C9F58329F1BE13D5EF /* navidrome.rs */,
 				C49F6D63F7082F5C9335DB00 /* queue.rs */,
 				912415D7014546E0B9D7537D /* settings.rs */,
@@ -184,6 +194,15 @@
 			);
 			name = src;
 			path = ../../src;
+			sourceTree = "<group>";
+		};
+		4AF7BD6FA3A2354DC24E2669 /* Native */ = {
+			isa = PBXGroup;
+			children = (
+				143834D80A888140861C9412 /* CoffiBridge.h */,
+				0A49ECB8B1F4F44C636DD760 /* CoffiNative.swift */,
+			);
+			path = Native;
 			sourceTree = "<group>";
 		};
 		53C66D2F8592C81A98401C61 /* integrations */ = {
@@ -359,6 +378,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				B747C26F170C92E78DF2D0B3 /* CoffiNative.swift in Sources */,
 				EDEC1B614CEA8C6EB57C22F5 /* main.mm in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -456,6 +476,7 @@
 				PRODUCT_BUNDLE_IDENTIFIER = app.coffi.player;
 				PRODUCT_NAME = "Coff-fi";
 				SDKROOT = iphoneos;
+				SWIFT_OBJC_BRIDGING_HEADER = "Sources/coff-fi/Native/CoffiBridge.h";
 				SWIFT_STRICT_CONCURRENCY = minimal;
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = 1;
@@ -547,6 +568,7 @@
 				PRODUCT_BUNDLE_IDENTIFIER = app.coffi.player;
 				PRODUCT_NAME = "Coff-fi";
 				SDKROOT = iphoneos;
+				SWIFT_OBJC_BRIDGING_HEADER = "Sources/coff-fi/Native/CoffiBridge.h";
 				SWIFT_STRICT_CONCURRENCY = minimal;
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = 1;

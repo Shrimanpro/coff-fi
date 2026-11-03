@@ -52,8 +52,13 @@ targets:
         CFBundleShortVersionString: 0.8.0
         CFBundleVersion: "0.8.0"
         CFBundleDisplayName: Coff-fi
+        # Keep playing with the screen locked / app in the background.
+        UIBackgroundModes: [audio]
         # Opt into ProMotion (120 Hz) animations on supported iPhones.
         CADisableMinimumFrameDurationOnPhone: true
+        # Music added through the Files app ("On My iPhone > Coff-fi > Music").
+        UIFileSharingEnabled: true
+        LSSupportsOpeningDocumentsInPlace: true
         NSLocalNetworkUsageDescription: Coff-fi connects to your Navidrome server and to Coff-fi on your other devices, so you can control playback from one to the other.
         # Advertising / finding other Coff-fi devices (remote control).
         NSBonjourServices: [_coffi._tcp]
@@ -75,6 +80,7 @@ targets:
         ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES: true
         SWIFT_VERSION: "5.0"
         SWIFT_STRICT_CONCURRENCY: minimal
+        SWIFT_OBJC_BRIDGING_HEADER: Sources/coff-fi/Native/CoffiBridge.h
         IPHONEOS_DEPLOYMENT_TARGET: "26.0"
         TARGETED_DEVICE_FAMILY: "1"
         EXCLUDED_ARCHS[sdk=iphoneos*]: x86_64
@@ -90,6 +96,7 @@ targets:
       - sdk: UIKit.framework
       - sdk: WebKit.framework
       - sdk: AVFoundation.framework
+      - sdk: MediaPlayer.framework
       - sdk: AudioToolbox.framework
       - sdk: CoreAudio.framework
     preBuildScripts:

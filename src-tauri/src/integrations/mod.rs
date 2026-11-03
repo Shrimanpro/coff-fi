@@ -21,7 +21,7 @@ use souvlaki::{MediaControlEvent, MediaControls, MediaMetadata, MediaPlayback, M
 /// On iOS the lock screen / Dynamic Island controls live in the native Swift layer, and
 /// there's no Discord client to talk to.
 #[cfg(target_os = "ios")]
-struct MediaControls;
+type MediaControls = crate::native::MediaControls;
 #[cfg(target_os = "ios")]
 #[allow(dead_code)]
 struct DiscordIpcClient;
@@ -118,7 +118,9 @@ pub fn spawn(settings: Settings, hwnd: Option<isize>, on_control: impl Fn(Contro
             #[cfg(target_os = "ios")]
             let _ = hwnd;
             #[cfg(target_os = "ios")]
-            let make_controls = |_: &Settings| -> Option<MediaControls> { None };
+            let make_controls = |cfg: &Settings| -> Option<MediaControls> {
+                cfg.media_controls.then(|| MediaControls::new(on_control.clone()))
+            };
             #[cfg(not(target_os = "ios"))]
             let make_controls = |cfg: &Settings| -> Option<MediaControls> {
                 if !cfg.media_controls {
@@ -173,6 +175,10 @@ pub fn spawn(settings: Settings, hwnd: Option<isize>, on_control: impl Fn(Contro
                     Msg::Track(np) => {
                         track = np;
                         started = now();
+                        #[cfg(target_os = "ios")]
+                        if let Some(c) = &mut controls {
+                            c.set_track(track.as_ref(), cfg.speed);
+                        }
                         #[cfg(not(target_os = "ios"))]
                         if let Some(c) = &mut controls {
                             match &track {
@@ -206,6 +212,10 @@ pub fn spawn(settings: Settings, hwnd: Option<isize>, on_control: impl Fn(Contro
                         position = pos;
                         if !changed {
                             continue;
+                        }
+                        #[cfg(target_os = "ios")]
+                        if let Some(c) = &mut controls {
+                            c.set_playback(track.is_some(), p, pos, cfg.speed);
                         }
                         #[cfg(not(target_os = "ios"))]
                         if let Some(c) = &mut controls {

@@ -43,11 +43,21 @@ static BROWSER: Mutex<Option<bonjour::Browser>> = Mutex::new(None);
 static DEVICES: Mutex<Vec<Device>> = Mutex::new(Vec::new());
 /// The OS's name for this device (iOS hands it over at launch).
 static SYSTEM_NAME: RwLock<Option<String>> = parking_lot::const_rwlock(None);
+/// False while this device can't answer (an iPhone in the background with nothing playing gets
+/// suspended): it then stops advertising, so others don't list a device they can't reach.
+static PRESENT: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(true);
 
 /// Events every controller receives (`player://state` is sent straight from the player event
 /// handler, since it isn't emitted to our own UI while in the background).
 const SHARED_EVENTS: &[&str] =
     &["player://track", "queue://changed", "player://favorite", "player://mode", "library://changed", "stats://changed", "sleep://changed"];
+
+#[cfg_attr(not(target_os = "ios"), allow(dead_code))]
+pub fn set_system_name(name: &str) {
+    if !name.trim().is_empty() {
+        *SYSTEM_NAME.write() = Some(name.trim().to_string());
+    }
+}
 
 fn system_name() -> String {
     if let Some(n) = SYSTEM_NAME.read().clone() {
@@ -112,10 +122,13 @@ pub fn apply(app: &AppHandle) {
     {
         let mut host = HOST.lock();
         if let Some(h) = host.as_mut() {
-            if h.advertised != name {
+            let present = PRESENT.load(std::sync::atomic::Ordering::Acquire);
+            if h.advertised != name || (present && h.reg.is_none()) {
                 h.reg = None;
-                h.reg = advertise(app, &name, h.server.port);
+                h.reg = if present { advertise(app, &name, h.server.port) } else { None };
                 h.advertised = name;
+            } else if !present {
+                h.reg = None;
             }
             return;
         }
@@ -126,9 +139,20 @@ pub fn apply(app: &AppHandle) {
     let app = app.clone();
     tauri::async_runtime::spawn(async move {
         let generation = GENERATION.fetch_add(1, std::sync::atomic::Ordering::Relaxed) + 1;
-        match server::start(app.clone()).await {
+        let h = app.clone();
+        let on_dead = move || {
+            let current = HOST.lock().as_ref().is_some_and(|x| x.generation == generation);
+            if current {
+                // Start over once the app is running again (right away if it already is).
+                tauri::async_runtime::spawn(async move {
+                    tokio::time::sleep(std::time::Duration::from_millis(500)).await;
+                    restart(&h, generation);
+                });
+            }
+        };
+        match server::start(app.clone(), on_dead).await {
             Ok(server) => {
-                let reg = advertise(&app, &name, server.port);
+                let reg = if PRESENT.load(std::sync::atomic::Ordering::Acquire) { advertise(&app, &name, server.port) } else { None };
                 let mut host = HOST.lock();
                 // Sharing may have been switched off while the server was starting.
                 if app.state::<AppState>().settings.read().remote.allow && host.is_none() {
@@ -143,6 +167,32 @@ pub fn apply(app: &AppHandle) {
             apply(&app);
         }
     });
+}
+
+/// Replaces the server of `generation` (if it's still the current one) with a fresh one.
+fn restart(app: &AppHandle, generation: u64) {
+    let old = {
+        let mut host = HOST.lock();
+        if host.as_ref().is_some_and(|h| h.generation == generation) { host.take() } else { None }
+    };
+    if old.is_some() {
+        drop(old);
+        apply(app);
+    }
+}
+
+/// Checks that our server still accepts connections; iOS kills the listening socket of a
+/// suspended app, so this runs whenever the app comes back to the foreground.
+async fn check_server(app: AppHandle) {
+    let Some((generation, port)) = HOST.lock().as_ref().map(|h| (h.generation, h.server.port)) else { return };
+    let alive = matches!(
+        tokio::time::timeout(std::time::Duration::from_secs(1), tokio::net::TcpStream::connect(("127.0.0.1", port))).await,
+        Ok(Ok(_))
+    );
+    if !alive {
+        eprintln!("remote: server stopped answering, restarting it");
+        restart(&app, generation);
+    }
 }
 
 fn advertise(app: &AppHandle, name: &str, port: u16) -> Option<bonjour::Registration> {
@@ -184,6 +234,30 @@ fn start_browse(app: &AppHandle) {
     }) {
         Ok(br) => *b = Some(br),
         Err(e) => eprintln!("remote: {e:#}"),
+    }
+}
+
+/// Advertise only while this device can answer (see [`PRESENT`]).
+pub fn set_present(app: &AppHandle, present: bool) {
+    if PRESENT.swap(present, std::sync::atomic::Ordering::AcqRel) != present {
+        apply(app);
+    }
+}
+
+/// iOS lifecycle: discovery only runs while the app is visible (the server keeps running, so
+/// a playing iPhone stays controllable); a dropped connection is picked up again on return.
+#[cfg_attr(not(target_os = "ios"), allow(dead_code))]
+pub fn set_background(app: &AppHandle, on: bool) {
+    if on {
+        *BROWSER.lock() = None;
+        DEVICES.lock().clear();
+    } else {
+        start_browse(app);
+        let (app, me) = (app.clone(), me(app));
+        tauri::async_runtime::spawn(async move {
+            check_server(app.clone()).await;
+            client::resume(&app, me).await;
+        });
     }
 }
 

@@ -53,6 +53,9 @@ pub enum Cmd {
     Database(PathBuf),
     /// Sleep timer: pause when the current song ends (instead of moving on).
     StopAfterCurrent(bool),
+    /// The app went to the background (true) or came back (false): buffer further ahead and
+    /// wake up less often while nobody is looking.
+    Background(bool),
 }
 
 #[derive(Clone, Debug, Default, Serialize, PartialEq)]
@@ -249,10 +252,12 @@ struct Engine {
     last_status: Status,
     mix: Vec<f32>,
     xbuf: Vec<f32>,
+    background: bool,
 }
 
 /// How far ahead of the device the engine decodes, in seconds.
 const LEAD_FOREGROUND: f64 = 0.3;
+const LEAD_BACKGROUND: f64 = 1.6;
 /// While playing, a state event is sent at least this often (the UI interpolates in between).
 const HEARTBEAT: Duration = Duration::from_secs(5);
 
@@ -285,6 +290,7 @@ impl Engine {
             last_status: Status::default(),
             mix: Vec::new(),
             xbuf: Vec::new(),
+            background: false,
         }
     }
 
@@ -311,7 +317,7 @@ impl Engine {
 
     /// Frames to keep decoded ahead of the device.
     fn target(&self) -> u64 {
-        let lead = LEAD_FOREGROUND;
+        let lead = if self.background { LEAD_BACKGROUND } else { LEAD_FOREGROUND };
         (self.rate() as f64 * lead) as u64
     }
 
@@ -427,6 +433,7 @@ impl Engine {
                     self.rebuild();
                 }
             }
+            Cmd::Background(on) => self.background = on,
             Cmd::QueueChanged => {
                 // If the next track was already pre-buffered, make sure it is still the right one.
                 let expected = self.queue.lock().peek_next();

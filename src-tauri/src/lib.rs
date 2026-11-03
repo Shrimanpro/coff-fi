@@ -2,6 +2,8 @@ mod audio;
 mod integrations;
 mod library;
 mod lyrics;
+#[cfg(target_os = "ios")]
+mod native;
 mod navidrome;
 mod queue;
 mod remote;
@@ -799,6 +801,32 @@ fn cover_response(req: &Request<Vec<u8>>) -> Response<Vec<u8>> {
 
 // ---------- events ----------
 
+/// True while the iOS app is in the background: the web UI isn't visible, so per-status
+/// events to it are skipped (each one wakes the WebView's process).
+static BACKGROUND: AtomicBool = AtomicBool::new(false);
+
+pub(crate) fn in_background() -> bool {
+    BACKGROUND.load(Ordering::Acquire)
+}
+
+/// App lifecycle (iOS): buffer further ahead in the background, and bring the UI up to date
+/// when it becomes visible again.
+#[cfg_attr(not(target_os = "ios"), allow(dead_code))]
+fn set_background(app: &AppHandle, on: bool) {
+    BACKGROUND.store(on, Ordering::Release);
+    let Some(st) = app.try_state::<AppState>() else { return };
+    st.player.send(Cmd::Background(on));
+    remote::set_background(app, on);
+    // In the background with nothing playing iOS suspends the app: stop advertising until then.
+    remote::set_present(app, !on || st.player.status.read().playing);
+    if !on {
+        let status = st.player.status.read().clone();
+        let track = status.track_id.and_then(|id| db::track(&st.db.lock(), id).ok().flatten());
+        let _ = app.emit("player://track", &track);
+        let _ = app.emit("player://state", status);
+    }
+}
+
 fn on_player_event(app: &AppHandle, e: Event) {
     let st = app.state::<AppState>();
     match e {
@@ -807,7 +835,12 @@ fn on_player_event(app: &AppHandle, e: Event) {
             if let Ok(json) = serde_json::to_string(&s) {
                 remote::server::broadcast("player://state", &json);
             }
+            if in_background() {
+                remote::set_present(app, s.playing);
+            }
+            if !in_background() {
                 let _ = app.emit("player://state", s);
+            }
         }
         Event::Track(id) => {
             let track = id.and_then(|id| db::track(&st.db.lock(), id).ok().flatten());
@@ -860,6 +893,11 @@ fn on_player_event(app: &AppHandle, e: Event) {
     }
 }
 
+#[cfg_attr(not(target_os = "ios"), allow(dead_code))]
+fn apply_control(app: &AppHandle, c: Control) {
+    on_control(app, c)
+}
+
 fn on_control(app: &AppHandle, c: Control) {
     let st = app.state::<AppState>();
     let pos = st.player.status.read().position;
@@ -887,6 +925,53 @@ fn get_platform() -> &'static str {
         "windows"
     } else {
         "linux"
+    }
+}
+
+/// Things only the native layer can show: "airplay" (route picker), "pick_folder" (Files).
+#[tauri::command]
+fn native_request(what: String) -> Res<()> {
+    #[cfg(target_os = "ios")]
+    {
+        native::request(&what);
+        Ok(())
+    }
+    #[cfg(not(target_os = "ios"))]
+    Err(format!("{what} is only available on iOS"))
+}
+
+/// Toggles the favorite of the playing song (lock-screen "like").
+#[cfg_attr(not(target_os = "ios"), allow(dead_code))]
+fn toggle_current_favorite(app: &AppHandle) {
+    let st = app.state::<AppState>();
+    let Some(id) = st.player.status.read().track_id else { return };
+    if let Ok(fav) = toggle_favorite(app.clone(), app.state::<AppState>(), id) {
+        let _ = app.emit("player://favorite", (id, fav));
+    }
+}
+
+/// Adds a music folder (from the iOS Files picker) and rescans. An `exclude:` prefix adds it to
+/// the excluded folders instead.
+#[cfg_attr(not(target_os = "ios"), allow(dead_code))]
+fn add_root(app: &AppHandle, path: String) {
+    let st = app.state::<AppState>();
+    let s = {
+        let mut s = st.settings.write();
+        let (list, path) = match path.strip_prefix("exclude:") {
+            Some(p) => (&mut s.excluded, p.to_string()),
+            None => (&mut s.roots, path),
+        };
+        if list.contains(&path) {
+            return;
+        }
+        list.push(path);
+        s.clone()
+    };
+    let _ = save_settings(&st.cfg_db.lock(), &s);
+    #[cfg(target_os = "ios")]
+    native::emit_settings_changed(app);
+    if !st.remote() {
+        rescan_now(app);
     }
 }
 
@@ -943,6 +1028,10 @@ pub fn run() {
             let remote_path = data.join("navidrome.db");
             let _ = THUMBS.set(thumbs.clone());
             navidrome::init(app.path().app_cache_dir()?);
+            #[cfg(target_os = "ios")]
+            {
+                native::set_app(app.handle().clone());
+            }
             let cfg_conn = db::open(&local_path)?;
             let conn = &cfg_conn;
 
@@ -951,6 +1040,29 @@ pub fn run() {
                 let seed = format!("{:?}-{}-{}", std::time::SystemTime::now(), std::process::id(), data.display());
                 s.remote.id = format!("{:016x}", xxhash_rust::xxh3::xxh3_64(seed.as_bytes()));
                 save_settings(conn, &s).map_err(anyhow::Error::msg)?;
+            }
+            // iOS moves the app's container on every install/update, so absolute paths into our own
+            // Documents folder go stale. Re-anchor them on the current Documents folder.
+            #[cfg(target_os = "ios")]
+            if let Ok(docs) = app.path().document_dir() {
+                let mut changed = false;
+                for list in [&mut s.roots, &mut s.excluded] {
+                    for r in list.iter_mut() {
+                        if Path::new(r.as_str()).exists() {
+                            continue;
+                        }
+                        if let Some((_, rest)) = r.split_once("/Documents/") {
+                            let fixed = docs.join(rest).to_string_lossy().into_owned();
+                            if fixed != *r {
+                                *r = fixed;
+                                changed = true;
+                            }
+                        }
+                    }
+                }
+                if changed {
+                    save_settings(conn, &s).map_err(anyhow::Error::msg)?;
+                }
             }
             // iOS: the app's own Documents folder (visible in the Files app) is the default library.
             #[cfg(target_os = "ios")]
@@ -1059,6 +1171,7 @@ pub fn run() {
             get_tags,
             set_tags,
             get_platform,
+            native_request,
             get_sleep,
             sleep_timer,
             set_play_mode,

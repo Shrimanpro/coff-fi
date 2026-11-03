@@ -64,6 +64,8 @@ pub fn init(app: &AppHandle) {
         }
     });
 }
+/// The device to reconnect to when the iOS app returns from the background.
+static RESUME: Mutex<Option<Device>> = Mutex::new(None);
 
 pub fn target() -> Option<Device> {
     CONN.lock().as_ref().map(|c| c.device.clone())
@@ -210,6 +212,11 @@ pub async fn connect(app: &AppHandle, mut device: Device, me: Value) -> Result<D
             *cur = None;
             drop(cur);
             drop(conn);
+            if crate::in_background() {
+                *RESUME.lock() = Some(device);
+                emit_target(&app, None, None);
+                return;
+            }
             // One quiet retry before telling the user (a socket cut during suspension is
             // usually only noticed just after coming back).
             if let Some(tx) = RETRY.get() {
@@ -225,12 +232,14 @@ pub async fn connect(app: &AppHandle, mut device: Device, me: Value) -> Result<D
         }
     });
     *CONN.lock() = Some(conn);
+    *RESUME.lock() = None;
     emit_target(app, Some(&device), None);
     Ok(device)
 }
 
 /// Stops controlling the other device. `notify` tells our UI (false when replacing the target).
 pub fn disconnect(app: &AppHandle, notify: bool) {
+    *RESUME.lock() = None;
     let old = CONN.lock().take();
     if let Some(c) = old {
         let _ = c.tx.send(Message::Close(None));
@@ -238,6 +247,17 @@ pub fn disconnect(app: &AppHandle, notify: bool) {
         if notify {
             emit_target(app, None, None);
         }
+    }
+}
+
+/// Reconnects to a device that dropped while the app was in the background.
+pub async fn resume(app: &AppHandle, me: Value) {
+    let Some(d) = RESUME.lock().take() else { return };
+    if CONN.lock().is_some() {
+        return;
+    }
+    if let Err(e) = connect(app, d.clone(), me).await {
+        emit_target(app, None, Some(format!("Lost connection to {}: {e:#}", d.name)));
     }
 }
 
