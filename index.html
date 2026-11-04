@@ -2,7 +2,8 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <!-- viewport-fit=cover lets the iOS layout draw under the notch / Dynamic Island and use safe-area insets. -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
     <title>Coff-fi</title>
     <script>
       try { const t = localStorage.getItem("theme"); if (t) document.documentElement.dataset.theme = t; } catch {}

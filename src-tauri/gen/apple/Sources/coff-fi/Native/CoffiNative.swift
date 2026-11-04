@@ -6,6 +6,7 @@ import AVFoundation
 import MediaPlayer
 import UIKit
 import UniformTypeIdentifiers
+import WebKit
 
 @_cdecl("coffi_native_install")
 public func coffiNativeInstall() {
@@ -39,6 +40,7 @@ final class CoffiNative: NSObject {
         configureSession()
         observeLifecycle()
         FolderAccess.restore()
+        WebViewTuning.applyWhenReady()
     }
 
     // MARK: Audio session
@@ -233,3 +235,47 @@ final class FolderAccess: NSObject, UIDocumentPickerDelegate {
     }
 }
 
+
+/// Lets the web UI render at the display's full refresh rate (120 Hz on ProMotion iPhones).
+/// WebKit throttles page rendering updates (requestAnimationFrame, JS-driven drags) to ~60 fps
+/// by default; that's a WebKit feature flag with no public API, so it's toggled through
+/// WKPreferences' feature list when available and silently skipped otherwise.
+enum WebViewTuning {
+    static func applyWhenReady(attempt: Int = 0) {
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+            guard let web = findWebView(in: UIHelpers.keyWindow) else {
+                if attempt < 40 { applyWhenReady(attempt: attempt + 1) }
+                return
+            }
+            disable60FPSCap(web.configuration.preferences)
+        }
+    }
+
+    private static func findWebView(in view: UIView?) -> WKWebView? {
+        guard let view else { return nil }
+        if let w = view as? WKWebView { return w }
+        for v in view.subviews {
+            if let w = findWebView(in: v) { return w }
+        }
+        return nil
+    }
+
+    private static func disable60FPSCap(_ prefs: WKPreferences) {
+        let featuresSel = NSSelectorFromString("_features")
+        let setSel = NSSelectorFromString("_setEnabled:forFeature:")
+        let cls: AnyObject = WKPreferences.self
+        guard cls.responds(to: featuresSel), prefs.responds(to: setSel),
+              let list = cls.perform(featuresSel)?.takeUnretainedValue() as? [NSObject] else {
+            NSLog("Coff-fi: WebKit feature list unavailable; page rendering stays at the default rate")
+            return
+        }
+        typealias SetEnabled = @convention(c) (AnyObject, Selector, Bool, AnyObject) -> Void
+        let fn = unsafeBitCast(prefs.method(for: setSel), to: SetEnabled.self)
+        var found = false
+        for f in list where (f.value(forKey: "key") as? String) == "PreferPageRenderingUpdatesNear60FPSEnabled" {
+            fn(prefs, setSel, false, f)
+            found = true
+        }
+        NSLog("Coff-fi: 60 fps page-rendering cap \(found ? "disabled" : "not found")")
+    }
+}

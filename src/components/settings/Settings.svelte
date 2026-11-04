@@ -1,7 +1,7 @@
 <script lang="ts">
   import { getVersion } from "@tauri-apps/api/app";
   import { open } from "@tauri-apps/plugin-dialog";
-  import { fade, scale } from "svelte/transition";
+  import { fade, fly, scale } from "svelte/transition";
   import { api } from "../../lib/ipc";
   import { remote } from "../../lib/remote.svelte";
   import { conf, saveSettings, setSource, toast, ui } from "../../lib/state.svelte";
@@ -9,6 +9,9 @@
   import VSlider from "./VSlider.svelte";
 
   type Tab = "eq" | "library" | "playback" | "integrations" | "navidrome" | "devices";
+  /** iOS: full-screen sheet, native Files picker, AirPlay instead of output devices, no Discord. */
+  const ios = ui.platform === "ios";
+  const sheet = (node: Element) => (ios ? fly(node, { y: 700, duration: 360, opacity: 1 }) : scale(node, { start: 0.96, duration: 260 }));
   let tab = $state<Tab>((ui.settingsTab as Tab) ?? "eq");
   ui.settingsTab = null;
   let ndBusy = $state(false);
@@ -36,7 +39,7 @@
   };
 
   $effect(() => {
-    if (tab === "playback") api.listDevices().then((d) => (devices = d));
+    if (tab === "playback" && !ios) api.listDevices().then((d) => (devices = d));
   });
 
   // The selected preset keeps its name while you tweak; `modified` tells you the
@@ -113,6 +116,11 @@
   }
 
   async function addFolder(list: "roots" | "excluded") {
+    if (ios) {
+      // The Files app picker; the chosen folder comes back through the native layer.
+      api.nativeRequest(list === "roots" ? "pick_folder" : "pick_exclude").catch((e) => toast(String(e)));
+      return;
+    }
     const dir = await open({ directory: true, multiple: false, title: list === "roots" ? "Choose a music folder" : "Choose a folder to exclude" });
     if (typeof dir === "string" && !s[list].includes(dir)) {
       s[list] = [...s[list], dir];
@@ -157,7 +165,13 @@
 <svelte:window onkeydown={(e) => e.key === "Escape" && !ui.menu && close()} />
 
 <div class="scrim" transition:fade={{ duration: 200 }} role="presentation" onclick={close}></div>
-<div class="dialog glass" transition:scale={{ start: 0.96, duration: 260 }} role="dialog" aria-label="Settings">
+<div class="dialog glass" class:ios transition:sheet role="dialog" aria-label="Settings">
+  {#if ios}
+    <div class="ihead">
+      <h2>Settings</h2>
+      <button class="done" onclick={close}>Done</button>
+    </div>
+  {/if}
   <nav>
     <h2>Settings</h2>
     {#each [["eq", "Equalizer"], ["library", "Library"], ["playback", "Playback"], ["integrations", "Integrations"], ["navidrome", "Navidrome"], ["devices", "Devices"]] as [id, label] (id)}
@@ -167,7 +181,7 @@
   </nav>
 
   <section>
-    <button class="icon-btn x" title="Close" onclick={close}><Icon name="close" /></button>
+    {#if !ios}<button class="icon-btn x" title="Close" onclick={close}><Icon name="close" /></button>{/if}
     {#if s}
       {#if tab === "eq"}
         <h3>Equalizer</h3>
@@ -216,7 +230,7 @@
             <VSlider label={f} value={s.eq.bands[i]} onchange={(v) => setBand(i, v)} />
           {/each}
         </div>
-        <p class="help">Drag a band to shape the sound; double-click resets it. Changes apply instantly. Save a curve to keep it as your own preset.</p>
+        <p class="help">Drag a band to shape the sound{ios ? "" : "; double-click resets it"}. Changes apply instantly. Save a curve to keep it as your own preset.</p>
       {:else if tab === "library"}
         <h3>Music folders</h3>
         <ul class="dirs">
@@ -237,7 +251,11 @@
         <button class="pill-btn ghost" onclick={() => addFolder("excluded")}><Icon name="plus" size={15} /> Exclude folder</button>
 
         <h3>Scanning</h3>
+        {#if ios}
+          <p class="help">Coff-fi rescans whenever you open the app. Copy music into Files › On My iPhone › Coff-fi › Music, or add any folder from Files.</p>
+        {:else}
           <label class="switch"><input type="checkbox" bind:checked={s.watch} onchange={() => saveSettings(0)} /><span></span> Watch folders for changes</label>
+        {/if}
         <div class="line">
           <button class="pill-btn" disabled={ui.scanning} onclick={() => api.rescan()}><Icon name="refresh" size={15} /> {ui.scanning ? "Scanning…" : "Rescan now"}</button>
         </div>
@@ -285,11 +303,13 @@
 
       {:else if tab === "integrations"}
         <h3>System media controls</h3>
-        <label class="switch"><input type="checkbox" bind:checked={s.media_controls} onchange={() => saveSettings(0)} /><span></span> Media keys & now-playing widget</label>
+        <label class="switch"><input type="checkbox" bind:checked={s.media_controls} onchange={() => saveSettings(0)} /><span></span> {ios ? "Lock Screen, Control Center & Dynamic Island" : "Media keys & now-playing widget"}</label>
 
+        {#if !ios}
         <h3>Discord Rich Presence</h3>
         <label class="switch"><input type="checkbox" bind:checked={s.discord.enabled} onchange={() => saveSettings(0)} /><span></span> Show what I'm listening to</label>
         <p class="help">Shows the song you're playing on your Discord profile while the Discord app is open.</p>
+        {/if}
 
         <h3>Last.fm scrobbling</h3>
         <label class="switch"><input type="checkbox" bind:checked={s.lastfm.enabled} onchange={() => saveSettings(0)} /><span></span> Scrobble plays</label>
@@ -308,11 +328,12 @@
         <h3>Control from other devices</h3>
         <label class="switch"><input type="checkbox" bind:checked={s.remote.allow} onchange={() => saveSettings(0)} /><span></span> Let other devices on this Wi-Fi control playback here</label>
         <p class="help">
-          Coff-fi on your other Mac or iPhone can then see this one under “Play on” and play, pause, skip, browse this library and change the queue.
+          Coff-fi on your other {ios ? "devices" : "Mac or iPhone"} can then see this one under “Play on” and play, pause, skip, browse this library and change the queue.
+          {#if ios}An iPhone can only be controlled while Coff-fi is open or playing.{/if}
         </p>
         <h3>Device name</h3>
         <input class="text" placeholder={remote.name || "Name shown to other devices"} bind:value={s.remote.name} onchange={() => saveSettings(0)} />
-        <p class="help">What other devices call this one. Leave empty to use the computer's name.</p>
+        <p class="help">What other devices call this one. Leave empty to use the {ios ? "iPhone's" : "computer's"} name.</p>
         {#if s.remote.allow}
           <h3>Controlling this device now</h3>
           {#if remote.controllers.length}
@@ -347,10 +368,19 @@
             <button class="pill-btn" disabled={ui.scanning} onclick={() => api.rescan()}><Icon name="refresh" size={15} /> {ui.scanning ? "Syncing…" : "Sync library now"}</button>
           </div>
         {/if}
+        {#if ios}
+        <p class="help">
+          Also switchable from the Local / Navidrome button on Home. The server's library is mirrored on your iPhone so browsing stays instant; songs
+          stream in their original quality, and the current song plus the next 8 in your queue are kept downloaded so playback survives a patchy
+          connection. Play counts, stars and scrobbles sync with the server. The password is stored on this iPhone in the app's settings.
+        </p>
+        {#if version}<p class="help">Coff-fi {version}</p>{/if}
+        {:else}
         <p class="help">
           Also switchable from the top-right toggle. The server's library is mirrored locally so browsing stays instant; songs stream in their
           original quality. Play counts, stars and scrobbles sync with the server. The password is stored on this computer in the app's settings.
         </p>
+        {/if}
       {/if}
     {/if}
   </section>

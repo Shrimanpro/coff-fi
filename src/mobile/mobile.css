@@ -1,0 +1,49 @@
+/* Global touches for the iOS layout. Coff-fi's tokens, fonts and grain stay as they are. */
+
+html[data-platform="ios"] {
+  -webkit-text-size-adjust: 100%;
+  -webkit-tap-highlight-color: transparent;
+  -webkit-touch-callout: none;
+  touch-action: manipulation;
+  overscroll-behavior: none;
+}
+
+html[data-platform="ios"] body {
+  font-size: 15px;
+  /* Seen only around the app "card" while Now Playing is open; the page backdrop is on .stage. */
+  background: #000;
+}
+
+/* The grain overlay sits above everything on desktop; keep it under the sheets on iOS. */
+html[data-platform="ios"] body::after {
+  z-index: 45;
+}
+
+html[data-platform="ios"] input,
+html[data-platform="ios"] textarea {
+  -webkit-user-select: text;
+  user-select: text;
+}
+
+/* Toasts float above the tab bar + mini player. */
+html[data-platform="ios"] .toast {
+  bottom: calc(env(safe-area-inset-bottom) + 92px) !important;
+  max-width: calc(100vw - 32px) !important;
+  text-align: center;
+  z-index: 210 !important;
+}
+html[data-platform="ios"] .toast.lifted {
+  bottom: calc(env(safe-area-inset-bottom) + 160px) !important;
+}
+
+/* Settings / song info open above Now Playing. */
+html[data-platform="ios"] .scrim {
+  z-index: 150 !important;
+}
+html[data-platform="ios"] .dialog {
+  z-index: 151 !important;
+}
+
+html[data-platform="ios"] .pill-btn:disabled {
+  opacity: 0.5;
+}

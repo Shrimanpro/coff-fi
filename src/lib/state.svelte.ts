@@ -9,6 +9,8 @@ export interface MenuItem {
 }
 
 export const ui = $state({
+  /** "ios" switches to the touch layout (src/mobile). */
+  platform: (document.documentElement.dataset.platform ?? "desktop") as string,
   base: "home" as "home" | "directory",
   dirPath: null as string | null,
   collection: null as { kind: TileKind; id: string } | null,
@@ -147,7 +149,7 @@ async function syncPlayer() {
   player.at = performance.now();
   player.track = st.track_id != null ? (queue.tracks.find((t) => t.id === st.track_id) ?? null) : null;
   refreshFav();
-  player.sleep = await api.getSleep().catch(() => player.sleep);
+  if (ui.platform === "ios" || remote.target) player.sleep = await api.getSleep().catch(() => player.sleep);
   if (remote.target) {
     const info = await api.remoteInfo().catch(() => null);
     if (info) remote.mode = { volume: info.volume, shuffle: info.shuffle, repeat: info.repeat };

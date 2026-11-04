@@ -1,11 +1,12 @@
 <script lang="ts">
   // Pick where music plays: this device or another Coff-fi on the network.
   import { deviceKind, remote } from "../lib/remote.svelte";
-  import { controlDevice } from "../lib/state.svelte";
+  import { controlDevice, ui } from "../lib/state.svelte";
   import type { Device } from "../lib/types";
   import Icon from "./Icon.svelte";
 
-  const here = navigator.userAgent.includes("Mac") ? "This Mac" : "This computer";
+  const ios = $derived(ui.platform === "ios");
+  const here = $derived(ui.platform === "ios" ? "This iPhone" : ui.platform === "macos" ? "This Mac" : "This computer");
   let address = $state("");
   let manual = $state(false);
 
@@ -39,13 +40,13 @@
 {#if remote.picker}
   <!-- Not ".scrim": mobile.css lifts every .scrim to z-index 150 for the settings sheet. -->
   <div class="pick-scrim" role="presentation" onclick={() => remote.connecting === null && (remote.picker = false)}></div>
-  <div class="picker" role="dialog" aria-label="Choose a device">
+  <div class="picker" class:ios role="dialog" aria-label="Choose a device">
     <div class="head">
       <h3>Play on</h3>
       <button class="close icon-btn" aria-label="Close" onclick={() => (remote.picker = false)}><Icon name="close" size={16} /></button>
     </div>
     <button class="dev" class:on={!remote.target} onclick={() => pick(null)}>
-      <Icon name="laptop" size={22} />
+      <Icon name={ios ? "phone" : "laptop"} size={22} />
       <span class="txt">
         <span class="name ellipsis">{here}</span>
         <span class="sub ellipsis">{remote.name}</span>

@@ -1,6 +1,6 @@
 <script lang="ts">
   import { revealItemInDir } from "@tauri-apps/plugin-opener";
-  import { fade, scale } from "svelte/transition";
+  import { fade, fly, scale } from "svelte/transition";
   import { quality, time } from "../lib/format";
   import { api } from "../lib/ipc";
   import { player, toast, ui } from "../lib/state.svelte";
@@ -8,6 +8,8 @@
   import Cover from "./Cover.svelte";
   import Icon from "./Icon.svelte";
 
+  const ios = ui.platform === "ios";
+  const sheet = (node: Element) => (ios ? fly(node, { y: 700, duration: 360, opacity: 1 }) : scale(node, { start: 0.96, duration: 260 }));
 
   // Opened only for local songs; the panel snapshots the track it was opened for.
   const t = ui.info!;
@@ -59,7 +61,7 @@
 <svelte:window onkeydown={(e) => e.key === "Escape" && !ui.menu && close()} />
 
 <div class="scrim" transition:fade={{ duration: 200 }} role="presentation" onclick={close}></div>
-<div class="dialog glass" transition:scale={{ start: 0.96, duration: 260 }} role="dialog" aria-label="Song info">
+<div class="dialog glass" class:ios transition:sheet role="dialog" aria-label="Song info">
   <header>
     <div class="art"><Cover covers={t.cover} size={192} radius={12} /></div>
     <div class="head-meta">
@@ -108,7 +110,7 @@
         <div class="path">
           <dt>File</dt>
           <dd class="ellipsis" title={t.path}>{t.path}</dd>
-          <button type="button" class="icon-btn" title="Show file" onclick={() => revealItemInDir(t.path).catch((x) => toast(String(x)))}><Icon name="folder" size={15} /></button>
+          {#if !ios}<button type="button" class="icon-btn" title="Show file" onclick={() => revealItemInDir(t.path).catch((x) => toast(String(x)))}><Icon name="folder" size={15} /></button>{/if}
         </div>
       </dl>
 
