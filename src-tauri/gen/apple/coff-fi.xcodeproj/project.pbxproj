@@ -61,6 +61,7 @@
 		B65B11DE01467D50106B5ACC /* bonjour.rs */ = {isa = PBXFileReference; path = bonjour.rs; sourceTree = "<group>"; };
 		BA402E6F2DB032E66CFFDA69 /* server.rs */ = {isa = PBXFileReference; path = server.rs; sourceTree = "<group>"; };
 		BC0EAF2412987D7F4160E67D /* matching.rs */ = {isa = PBXFileReference; path = matching.rs; sourceTree = "<group>"; };
+		BE64962526B37EB7C02557CA /* cache.rs */ = {isa = PBXFileReference; path = cache.rs; sourceTree = "<group>"; };
 		C1AEED9832A81EF09262DFEA /* dispatch.rs */ = {isa = PBXFileReference; path = dispatch.rs; sourceTree = "<group>"; };
 		C49F6D63F7082F5C9335DB00 /* queue.rs */ = {isa = PBXFileReference; path = queue.rs; sourceTree = "<group>"; };
 		CABA56FF3321BF1CFC47EC4F /* CoreGraphics.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CoreGraphics.framework; path = System/Library/Frameworks/CoreGraphics.framework; sourceTree = SDKROOT; };
@@ -180,6 +181,7 @@
 		3E4EC4ED75FA91B726F3E033 /* src */ = {
 			isa = PBXGroup;
 			children = (
+				BE64962526B37EB7C02557CA /* cache.rs */,
 				0F93E3D60E016C4F8AACBE1F /* lib.rs */,
 				E15B08620A742D63CC7BDF1B /* main.rs */,
 				F6E52BD1AD398E4306E7514A /* native.rs */,

@@ -461,16 +461,74 @@ struct Progress {
 }
 
 struct Shared {
+    id: String,
     file: PathBuf,
     len: Option<u64>,
     progress: Mutex<Progress>,
     cv: Condvar,
 }
 
+/// Songs with a live [`Stream`] (one entry per stream). The queue cache doesn't download these
+/// a second time; a finished stream hands its file over instead.
+static STREAMING: Mutex<Vec<String>> = Mutex::new(Vec::new());
+
+pub fn is_streaming(id: &str) -> bool {
+    STREAMING.lock().iter().any(|s| s == id)
+}
+
 impl Drop for Shared {
     fn drop(&mut self) {
-        let _ = std::fs::remove_file(&self.file);
+        {
+            let mut live = STREAMING.lock();
+            if let Some(i) = live.iter().position(|s| *s == self.id) {
+                live.swap_remove(i);
+            }
+        }
+        // A complete download of an upcoming song moves into the queue cache instead.
+        let p = self.progress.get_mut();
+        let complete = p.done && p.err.is_none() && self.len.is_none_or(|l| l == p.have);
+        if !(complete && crate::cache::adopt(&self.id, &self.file)) {
+            let _ = std::fs::remove_file(&self.file);
+        }
+        // If the song is still wanted but wasn't handed over, the cache fetches it now.
+        crate::cache::kick();
     }
+}
+
+/// Downloads a whole song to `dest` (for the queue cache). `keep_going` is polled between
+/// chunks; returns Ok(false) when it asked to stop.
+pub fn download(id: &str, dest: &std::path::Path, keep_going: impl Fn() -> bool) -> Result<bool> {
+    let s = server()?;
+    let mut res = stream_client()
+        .get(format!("{}/rest/stream", base(&s)))
+        .query(&auth(&s))
+        .query(&[("id", id), ("format", "raw")])
+        .send()
+        .context("Can't reach the Navidrome server")?
+        .error_for_status()?;
+    if res.headers().get("content-type").and_then(|v| v.to_str().ok()).is_some_and(|c| c.contains("json") || c.contains("xml")) {
+        bail!("Navidrome refused to stream this song");
+    }
+    let len = res.content_length();
+    let mut w = File::create(dest)?;
+    let mut buf = vec![0u8; 64 * 1024];
+    let mut have = 0u64;
+    loop {
+        if !keep_going() {
+            return Ok(false);
+        }
+        let n = res.read(&mut buf)?;
+        if n == 0 {
+            break;
+        }
+        w.write_all(&buf[..n])?;
+        have += n as u64;
+    }
+    w.sync_all()?;
+    if len.is_some_and(|l| l != have) {
+        bail!("download ended early");
+    }
+    Ok(true)
 }
 
 /// A seekable media source over an HTTP download: a background thread writes the file to a
@@ -504,7 +562,8 @@ impl Stream {
         let file = dir.join(format!("{}-{}.part", id.replace(|c: char| !c.is_ascii_alphanumeric(), "_"), N.fetch_add(1, Ordering::Relaxed)));
         let mut w = File::create(&file)?;
         let f = File::open(&file)?;
-        let shared = Arc::new(Shared { file, len, progress: Mutex::new(Progress { have: 0, done: false, err: None }), cv: Condvar::new() });
+        STREAMING.lock().push(id.to_string());
+        let shared = Arc::new(Shared { id: id.to_string(), file, len, progress: Mutex::new(Progress { have: 0, done: false, err: None }), cv: Condvar::new() });
         let weak = Arc::downgrade(&shared);
         std::thread::Builder::new().name("stream".into()).spawn(move || {
             let mut buf = vec![0u8; 64 * 1024];

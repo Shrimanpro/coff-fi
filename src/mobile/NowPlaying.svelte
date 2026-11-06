@@ -133,7 +133,7 @@
     return () => fn();
   }
 
-  const source = $derived(remote.target ? `On ${remote.target.name}` : isRemote(t) ? "Navidrome" : "Local");
+  const source = $derived(remote.target ? `On ${remote.target.name}` : player.cached ? "Cache" : isRemote(t) ? "Navidrome" : "Local");
   const middle = $derived(t ? `${source} · ${quality(t)}` : "");
 
   // ---- drag down to dismiss (follows the finger, springs back or flings closed) ----

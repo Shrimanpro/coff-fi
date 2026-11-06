@@ -23,7 +23,10 @@ pub struct Decoder {
 impl Decoder {
     pub fn open(path: &Path) -> Result<Self> {
         let p = path.to_string_lossy();
-        let src: Box<dyn MediaSource> = if p.starts_with(crate::navidrome::PREFIX) {
+        let cached = crate::navidrome::song_id(&p).and_then(crate::cache::cached);
+        let src: Box<dyn MediaSource> = if let Some(file) = cached {
+            Box::new(File::open(file)?)
+        } else if p.starts_with(crate::navidrome::PREFIX) {
             Box::new(crate::navidrome::Stream::open(&p)?)
         } else {
             Box::new(File::open(path)?)

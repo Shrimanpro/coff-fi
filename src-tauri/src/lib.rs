@@ -1,4 +1,5 @@
 mod audio;
+mod cache;
 mod integrations;
 mod library;
 mod lyrics;
@@ -561,7 +562,31 @@ fn queue_changed(app: &AppHandle, st: &AppState) {
         eprintln!("persist queue: {e}");
     }
     st.player.send(Cmd::QueueChanged);
+    update_cache(st);
     let _ = app.emit("queue://changed", ());
+}
+
+/// Keeps the 9-song queue cache in step with what's playing and coming up next.
+fn update_cache(st: &AppState) {
+    if !cache::enabled() {
+        return;
+    }
+    if !st.remote() {
+        cache::update(Vec::new());
+        return;
+    }
+    let q = st.player.queue.lock().clone();
+    let n = q.items.len();
+    // The current song and the next 8 in play order; with repeat on the queue wraps around.
+    let ahead = if q.repeat != Repeat::Off { n } else { n.saturating_sub(q.pos) };
+    let span: Vec<i64> = (0..ahead.min(cache::SLOTS)).map(|k| q.items[(q.pos + k) % n]).collect();
+    let tracks = db::tracks_by_ids(&st.db.lock(), &span).unwrap_or_default();
+    let items: Vec<(i64, Option<String>)> = span
+        .iter()
+        .map(|id| (*id, tracks.iter().find(|t| t.id == *id).and_then(|t| navidrome::song_id(&t.path)).map(String::from)))
+        .collect();
+    let ids = cache::window(&items, 0, false);
+    cache::update(ids);
 }
 
 /// Moves the current queue into history before it gets replaced.
@@ -858,6 +883,7 @@ fn on_player_event(app: &AppHandle, e: Event) {
             let _ = app.emit("queue://changed", ());
             let q = st.player.queue.lock().clone();
             let _ = persist_current(&mut st.db.lock(), &q);
+            update_cache(&st);
             let integ = st.integrations.clone();
             match track {
                 Some(t) => {
@@ -926,6 +952,13 @@ fn get_platform() -> &'static str {
     } else {
         "linux"
     }
+}
+
+/// Whether a song plays from the on-device queue cache (for the "Cache · FLAC" quality line).
+#[tauri::command]
+fn is_cached(st: State<AppState>, id: i64) -> bool {
+    cache::enabled()
+        && db::track(&st.db.lock(), id).ok().flatten().is_some_and(|t| navidrome::song_id(&t.path).and_then(cache::cached).is_some())
 }
 
 /// Things only the native layer can show: "airplay" (route picker), "pick_folder" (Files).
@@ -1030,6 +1063,7 @@ pub fn run() {
             navidrome::init(app.path().app_cache_dir()?);
             #[cfg(target_os = "ios")]
             {
+                cache::init(&app.path().app_cache_dir()?);
                 native::set_app(app.handle().clone());
             }
             let cfg_conn = db::open(&local_path)?;
@@ -1171,6 +1205,7 @@ pub fn run() {
             get_tags,
             set_tags,
             get_platform,
+            is_cached,
             native_request,
             get_sleep,
             sleep_timer,

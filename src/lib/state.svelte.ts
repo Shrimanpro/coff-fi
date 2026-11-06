@@ -39,6 +39,8 @@ export const player = $state({
   track: null as Track | null,
   at: performance.now(),
   fav: false,
+  /** The playing song comes from the on-device queue cache (iOS). */
+  cached: false,
   sleep: { mode: "off", until: null } as SleepState,
 });
 
@@ -142,6 +144,10 @@ async function refreshFav() {
   player.fav = player.track ? await api.isFavorite(player.track.id) : false;
 }
 
+async function refreshCached() {
+  player.cached = ui.platform === "ios" && player.track ? await api.isCached(player.track.id).catch(() => false) : false;
+}
+
 /** Loads the player, queue and sleep timer of whichever device the UI is showing. */
 async function syncPlayer() {
   const [st] = await Promise.all([api.status(), refreshQueue()]);
@@ -149,6 +155,7 @@ async function syncPlayer() {
   player.at = performance.now();
   player.track = st.track_id != null ? (queue.tracks.find((t) => t.id === st.track_id) ?? null) : null;
   refreshFav();
+  refreshCached();
   if (ui.platform === "ios" || remote.target) player.sleep = await api.getSleep().catch(() => player.sleep);
   if (remote.target) {
     const info = await api.remoteInfo().catch(() => null);
@@ -231,9 +238,12 @@ export async function init() {
     on<Track | null>("player://track", (p) => {
       player.track = p;
       refreshFav();
+      refreshCached();
     }),
     on("queue://changed", () => {
       refreshQueue();
+      // The cache fills in the background; re-check shortly after the queue moves.
+      if (!remote.target) setTimeout(refreshCached, 1500);
     }),
     on<SleepState>("sleep://changed", (p) => (player.sleep = p)),
     listen("settings://changed", async () => {

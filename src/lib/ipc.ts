@@ -65,6 +65,8 @@ export const api = {
   getTags: (id: number) => invoke<FileInfo>("get_tags", { id }),
   setTags: (id: number, tags: Tags) => invoke<Track>("set_tags", { id, tags }),
   platform: () => invoke<"ios" | "macos" | "windows" | "linux">("get_platform"),
+  /** True when the song plays from the on-device 9-song queue cache (iOS). */
+  isCached: (id: number) => (remote.target ? Promise.resolve(false) : invoke<boolean>("is_cached", { id })),
   setPlayMode: (mode: { shuffle?: boolean; repeat?: Repeat }) => invoke<void>("set_play_mode", { shuffle: mode.shuffle ?? null, repeat: mode.repeat ?? null }),
   remoteInfo: () => remoteApi.call<PlayMode & { name: string; platform: string }>("remote_info"),
   /** iOS only: "airplay" (route picker), "pick_folder" / "pick_exclude" (Files app). */
