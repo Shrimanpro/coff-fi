@@ -12,6 +12,7 @@
   import ContextMenu from "./ContextMenu.svelte";
   import "./mobile.css";
   import { m, pop, stage, top } from "./nav.svelte";
+  import NowPlaying from "./NowPlaying.svelte";
   import CollectionPage from "./pages/CollectionPage.svelte";
   import FolderPage from "./pages/FolderPage.svelte";
   import HomePage from "./pages/HomePage.svelte";
@@ -133,6 +134,10 @@
 
 <TabBar />
 </div>
+
+{#if m.nowPlaying}
+  <NowPlaying />
+{/if}
 
 {#if ui.settingsOpen}
   <Settings />

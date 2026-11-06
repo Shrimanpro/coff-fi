@@ -33,6 +33,7 @@ export const m = $state({
   /** Slide direction of the last navigation, for the page transition. */
   dir: 1,
   nowPlaying: false,
+  npMode: "art" as "art" | "lyrics" | "queue",
   sheet: null as { title?: string; subtitle?: string; items: SheetItem[] } | null,
   ctx: null as ContextMenu | null,
   /** Tab bar collapsed to a single tab beside the mini player (scrolled down while playing). */
@@ -160,6 +161,16 @@ export function trackMenu(t: Track, el: HTMLElement, onplay?: () => void) {
   };
 }
 
+/** Favorite toggle with immediate feedback. */
+export async function toggleFav(t: Track) {
+  try {
+    const on = await api.toggleFavorite(t.id);
+    if (player.track?.id === t.id) player.fav = on;
+    toast(on ? `Added “${t.title}” to Favorites` : `Removed “${t.title}” from Favorites`);
+  } catch (e) {
+    toast(String(e));
+  }
+}
 
 const PRESS_MS = 300;
 

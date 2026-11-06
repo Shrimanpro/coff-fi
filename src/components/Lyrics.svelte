@@ -142,6 +142,23 @@
     manualTimer = setTimeout(() => (manual = false), 2500);
   }
 
+  // Touch: dragging the lyric sheet browses it, like the wheel on desktop.
+  let touchY: number | null = null;
+  function touchStart(e: TouchEvent) {
+    if (synced) touchY = e.touches[0].clientY;
+  }
+  function touchMove(e: TouchEvent) {
+    if (!synced || touchY == null) return;
+    const y = e.touches[0].clientY;
+    const dy = y - touchY;
+    touchY = y;
+    if (Math.abs(dy) < 0.5) return;
+    manual = true;
+    shift += dy;
+    clearTimeout(manualTimer);
+    manualTimer = setTimeout(() => (manual = false), 2500);
+  }
+
   function seek(i: number) {
     if (!synced || !lyr) return;
     manual = false;
@@ -161,7 +178,7 @@
 <svelte:window onresize={() => (vh = window.innerHeight)} />
 
 <div class="wrap">
-<div class="lyrics" role="presentation" class:synced class:manual bind:this={viewport} onwheel={wheel}>
+<div class="lyrics" role="presentation" class:synced class:manual bind:this={viewport} onwheel={wheel} ontouchstart={touchStart} ontouchmove={touchMove} ontouchend={() => (touchY = null)}>
   {#if loading}
     <div class="msg"><span class="dots"><i></i><i></i><i></i></span></div>
   {:else if !lyr}
