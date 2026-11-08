@@ -11,8 +11,9 @@
   import { api, blurSrc, isRemote } from "../lib/ipc";
   import RemoteBadge from "../components/RemoteBadge.svelte";
   import { remote } from "../lib/remote.svelte";
-  import { anchors, cycleRepeat, player, queue, setVolume, toast, toggleShuffle, volume } from "../lib/state.svelte";
+  import { anchors, conf, cycleRepeat, player, queue, setVolume, toast, toggleShuffle, volume } from "../lib/state.svelte";
   import { goArtist, m, np, openSheet, stage, toggleFav, trackSheet } from "./nav.svelte";
+  import Nightstand from "./Nightstand.svelte";
   import QueuePane from "./QueuePane.svelte";
 
   const t = $derived(player.track);
@@ -32,6 +33,28 @@
     if (!t) m.nowPlaying = false;
   });
 
+  // ---------- Nightstand (Now Playing turned sideways) ----------
+  const landscapeQuery = matchMedia("(orientation: landscape)");
+  let landscape = $state(landscapeQuery.matches);
+  $effect(() => {
+    const on = () => (landscape = landscapeQuery.matches);
+    landscapeQuery.addEventListener("change", on);
+    return () => landscapeQuery.removeEventListener("change", on);
+  });
+  const nightstandOn = $derived(conf.s?.nightstand ?? true);
+  const nightstand = $derived(landscape && nightstandOn);
+  const native = (what: string) => api.nativeRequest(what).catch(() => {});
+  // Rotation is only unlocked while this sheet is open (and the feature is on).
+  $effect(() => {
+    native(nightstandOn ? "orient:any" : "orient:portrait");
+    return () => native("orient:portrait");
+  });
+  // Keep the screen awake while Nightstand is showing, if allowed in Settings.
+  $effect(() => {
+    const awake = nightstand && (conf.s?.nightstand_awake ?? true);
+    native(awake ? "awake:on" : "awake:off");
+    return () => native("awake:off");
+  });
 
   // ---------- motion ----------
   // Everything below animates transform/opacity only (compositor, full refresh rate) with
@@ -227,6 +250,9 @@
 
 </script>
 
+{#if t && nightstand}
+  <Nightstand onclose={() => close()} />
+{/if}
 
 {#if t}
   <div class="np" class:dragging bind:this={sheet} role="dialog" aria-label="Now Playing">

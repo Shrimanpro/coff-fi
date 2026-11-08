@@ -110,6 +110,10 @@ pub struct Settings {
     pub discord: Discord,
     pub lastfm: LastFm,
     pub navidrome: Navidrome,
+    /// iOS: turning the phone sideways in Now Playing opens the full-screen Nightstand view.
+    pub nightstand: bool,
+    /// iOS: keep the screen awake (no auto-lock) while the Nightstand view is showing.
+    pub nightstand_awake: bool,
     pub remote: Remote,
 }
 
@@ -134,6 +138,8 @@ impl Default for Settings {
             discord: Discord::default(),
             lastfm: LastFm::default(),
             navidrome: Navidrome::default(),
+            nightstand: true,
+            nightstand_awake: true,
             remote: Remote::default(),
         }
     }

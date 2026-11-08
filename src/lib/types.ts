@@ -151,6 +151,10 @@ export interface Settings {
   discord: { enabled: boolean };
   lastfm: { enabled: boolean; api_key: string; api_secret: string; username: string; session_key: string };
   navidrome: Navidrome;
+  /** iOS: turning the phone sideways in Now Playing opens the full-screen Nightstand view. */
+  nightstand: boolean;
+  /** iOS: keep the screen awake while the Nightstand view is showing. */
+  nightstand_awake: boolean;
   /** Being controlled from other devices on the network. */
   remote: { allow: boolean; name: string; id: string };
 }

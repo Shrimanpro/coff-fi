@@ -41,6 +41,7 @@ final class CoffiNative: NSObject {
         observeLifecycle()
         FolderAccess.restore()
         WebViewTuning.applyWhenReady()
+        OrientationControl.install()
     }
 
     // MARK: Audio session
@@ -155,6 +156,25 @@ final class CoffiNative: NSObject {
     // MARK: Requests from the web UI
 
     private func handle(request: String) {
+        switch request {
+        case "orient:any": OrientationControl.allowLandscape(true); return
+        case "orient:portrait": OrientationControl.allowLandscape(false); return
+        // Nightstand mode: keep the screen on (no auto-lock) while it's showing.
+        case "awake:on": UIApplication.shared.isIdleTimerDisabled = true; return
+        case "awake:off": UIApplication.shared.isIdleTimerDisabled = false; return
+        #if DEBUG
+        // Simulator testing only: rotate as if the phone were turned sideways.
+        case "orient:test-landscape":
+            UIHelpers.keyWindow?.windowScene?.requestGeometryUpdate(.iOS(interfaceOrientations: .landscapeRight)) { e in
+                NSLog("Coff-fi: test rotation refused: \(e.localizedDescription)")
+            }
+            return
+        case "awake:test":
+            NSLog("Coff-fi: idle timer disabled = \(UIApplication.shared.isIdleTimerDisabled)")
+            return
+        #endif
+        default: break
+        }
         switch request {
         case "pick_folder": FolderAccess.pick(exclude: false)
         case "pick_exclude": FolderAccess.pick(exclude: true)
@@ -277,5 +297,52 @@ enum WebViewTuning {
             found = true
         }
         NSLog("Coff-fi: 60 fps page-rendering cap \(found ? "disabled" : "not found")")
+    }
+}
+
+
+/// Portrait everywhere, landscape only while Now Playing is open with Nightstand mode on.
+/// Tauri's root view controller (TaoUIViewController) exposes a settable
+/// `supportedInterfaceOrientations`, which is what iOS consults, so the mask is set there.
+enum OrientationControl {
+    private static var mask: UIInterfaceOrientationMask = .portrait
+
+    /// Lock to portrait as soon as Tauri's window exists.
+    static func install(attempt: Int = 0) {
+        DispatchQueue.main.asyncAfter(deadline: .now() + (attempt == 0 ? 0 : 0.1)) {
+            if !apply(), attempt < 100 { install(attempt: attempt + 1) }
+        }
+    }
+
+    static func allowLandscape(_ on: Bool) {
+        mask = on ? .allButUpsideDown : .portrait
+        apply()
+        if !on, let scene = UIHelpers.keyWindow?.windowScene, scene.interfaceOrientation != .portrait {
+            // Leaving Now Playing while sideways: rotate the app back upright.
+            scene.requestGeometryUpdate(.iOS(interfaceOrientations: .portrait)) { _ in }
+        }
+    }
+
+    /// Returns false while there's no root view controller yet.
+    @discardableResult
+    private static func apply() -> Bool {
+        let sel = NSSelectorFromString("setSupportedInterfaceOrientations:")
+        var found = false
+        for scene in UIApplication.shared.connectedScenes.compactMap({ $0 as? UIWindowScene }) {
+            for w in scene.windows {
+                guard let vc = w.rootViewController else { continue }
+                found = true
+                if vc.responds(to: sel) {
+                    typealias Setter = @convention(c) (AnyObject, Selector, UInt) -> Void
+                    let set = unsafeBitCast(vc.method(for: sel), to: Setter.self)
+                    set(vc, sel, mask.rawValue)
+                }
+                vc.setNeedsUpdateOfSupportedInterfaceOrientations()
+            }
+        }
+        if found, mask == .portrait, let scene = UIHelpers.keyWindow?.windowScene, scene.interfaceOrientation != .portrait {
+            scene.requestGeometryUpdate(.iOS(interfaceOrientations: .portrait)) { _ in }
+        }
+        return found
     }
 }

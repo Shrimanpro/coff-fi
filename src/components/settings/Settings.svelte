@@ -301,6 +301,15 @@
         </div>
         <p class="help">Vinyl-style: pitch follows speed, like a turntable.</p>
 
+        {#if ios}
+          <h3>Nightstand mode</h3>
+          <label class="switch"><input type="checkbox" bind:checked={s.nightstand} onchange={() => saveSettings(0)} /><span></span> Turn Now Playing sideways for full-screen lyrics</label>
+          <label class="switch" class:dim={!s.nightstand}><input type="checkbox" bind:checked={s.nightstand_awake} disabled={!s.nightstand} onchange={() => saveSettings(0)} /><span></span> Keep the screen awake in Nightstand mode</label>
+          <p class="help">
+            With Now Playing open, rotate your iPhone sideways to get the full-screen player with synced lyrics, like Coff-fi's desktop full screen.
+            Rotate back to return. Portrait Orientation Lock in Control Center stops the rotation.
+          </p>
+        {/if}
       {:else if tab === "integrations"}
         <h3>System media controls</h3>
         <label class="switch"><input type="checkbox" bind:checked={s.media_controls} onchange={() => saveSettings(0)} /><span></span> {ios ? "Lock Screen, Control Center & Dynamic Island" : "Media keys & now-playing widget"}</label>
