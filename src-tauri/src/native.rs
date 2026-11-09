@@ -182,6 +182,51 @@ unsafe fn str_arg(p: *const c_char) -> String {
     CStr::from_ptr(p).to_string_lossy().into_owned()
 }
 
+fn out(s: String) -> *mut c_char {
+    cstring(&s).into_raw()
+}
+
+/// Frees a string returned by `coffi_find`.
+#[no_mangle]
+pub extern "C" fn coffi_string_free(p: *mut c_char) {
+    if !p.is_null() {
+        drop(unsafe { CString::from_raw(p) });
+    }
+}
+
+// ---------- Siri / App Intents ----------
+
+/// True once the library is open and the player is running.
+#[no_mangle]
+pub extern "C" fn coffi_ready() -> bool {
+    APP.get().is_some_and(|a| a.try_state::<AppState>().is_some())
+}
+
+#[derive(Serialize)]
+pub struct Entity {
+    pub kind: String,
+    pub id: String,
+    pub name: String,
+    pub subtitle: String,
+}
+
+/// Searches the library for Siri. `kind`: "playlist" | "album" | "artist" | "song".
+/// An empty `query` returns suggestions. Returns a JSON array of [`Entity`] (free with
+/// `coffi_string_free`).
+#[no_mangle]
+pub extern "C" fn coffi_find(kind: *const c_char, query: *const c_char) -> *mut c_char {
+    let (kind, query) = unsafe { (str_arg(kind), str_arg(query)) };
+    let list = APP.get().map(|app| crate::siri_find(app, &kind, &query)).unwrap_or_default();
+    out(serde_json::to_string(&list).unwrap_or_else(|_| "[]".into()))
+}
+
+/// Plays an entity found with `coffi_find`. Returns false if it doesn't exist (anymore).
+#[no_mangle]
+pub extern "C" fn coffi_play(kind: *const c_char, id: *const c_char, shuffle: bool) -> bool {
+    let (kind, id) = unsafe { (str_arg(kind), str_arg(id)) };
+    APP.get().is_some_and(|app| crate::siri_play(app, &kind, &id, shuffle))
+}
+
 pub fn emit_settings_changed(app: &AppHandle) {
     let _ = app.emit("settings://changed", ());
 }

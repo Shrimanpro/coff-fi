@@ -68,6 +68,13 @@ targets:
         # Music added through the Files app ("On My iPhone > Coff-fi > Music").
         UIFileSharingEnabled: true
         LSSupportsOpeningDocumentsInPlace: true
+        # Siri (SiriKit media intent handled in-app) + App Intents.
+        NSSiriUsageDescription: Coff-fi uses Siri so you can play your playlists, albums, artists and songs by voice.
+        # Set to false (and remove com.apple.developer.siri from the entitlements) when signing
+        # with a free Apple ID; App Intents keep working either way.
+        CoffiSiriKit: false
+        INIntentsSupported: [INPlayMediaIntent]
+        INSupportedMediaCategories: [INMediaCategoryMusic]
         NSLocalNetworkUsageDescription: Coff-fi connects to your Navidrome server and to Coff-fi on your other devices, so you can control playback from one to the other.
         # Advertising / finding other Coff-fi devices (remote control).
         NSBonjourServices: [_coffi._tcp]
@@ -106,6 +113,9 @@ targets:
       - sdk: WebKit.framework
       - sdk: AVFoundation.framework
       - sdk: MediaPlayer.framework
+      - sdk: AppIntents.framework
+      - sdk: Intents.framework
+      - sdk: CoreSpotlight.framework
       - sdk: AudioToolbox.framework
       - sdk: CoreAudio.framework
     preBuildScripts:

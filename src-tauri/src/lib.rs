@@ -376,6 +376,9 @@ fn rescan_now(app: &AppHandle) {
         }
         st.scanning.store(false, Ordering::Release);
         let _ = app.emit("library://scanning", false);
+        // Let Siri know about new playlists, albums and artists.
+        #[cfg(target_os = "ios")]
+        native::request("refresh_shortcuts");
     });
 }
 
@@ -1042,6 +1045,66 @@ fn sleep_timer(app: AppHandle, st: State<AppState>, mode: String, minutes: Optio
     *st.sleep.lock() = state.clone();
     let _ = app.emit("sleep://changed", &state);
     Ok(state)
+}
+
+// ---------- Siri ----------
+
+#[cfg(target_os = "ios")]
+fn siri_find(app: &AppHandle, kind: &str, query: &str) -> Vec<native::Entity> {
+    let st = app.state::<AppState>();
+    let conn = st.db.lock();
+    let tile = |t: Tile| native::Entity { kind: t.kind.to_string(), id: t.id, name: t.name, subtitle: t.subtitle };
+    let q = query.trim();
+    if q.is_empty() {
+        // Suggestions: what shows on the Home screen.
+        let Ok(h) = library::home(&conn, &st.random.read()) else { return Vec::new() };
+        return match kind {
+            "playlist" => h.server_playlists.into_iter().chain(h.playlists).map(tile).collect(),
+            "album" => h.albums.into_iter().take(50).map(tile).collect(),
+            "artist" => h.artists.into_iter().take(50).map(tile).collect(),
+            _ => h.songs.into_iter().take(50).map(|t| native::Entity { kind: "song".into(), id: t.id.to_string(), name: t.title, subtitle: t.artist }).collect(),
+        };
+    }
+    // Siri often keeps the word "playlist"/"album" in the spoken name.
+    let cleaned: String = q
+        .split_whitespace()
+        .filter(|w| !matches!(w.to_lowercase().as_str(), "playlist" | "album" | "song" | "my" | "the" | "by"))
+        .collect::<Vec<_>>()
+        .join(" ");
+    let q = if cleaned.is_empty() { q.to_string() } else { cleaned };
+    let Ok(r) = library::search(&conn, &q) else { return Vec::new() };
+    match kind {
+        "playlist" => r.playlists.into_iter().map(tile).collect(),
+        "album" => r.albums.into_iter().map(tile).collect(),
+        "artist" => r.artists.into_iter().map(tile).collect(),
+        _ => r.songs.into_iter().map(|t| native::Entity { kind: "song".into(), id: t.id.to_string(), name: t.title, subtitle: t.artist }).collect(),
+    }
+}
+
+#[cfg(target_os = "ios")]
+fn siri_play(app: &AppHandle, kind: &str, id: &str, shuffle: bool) -> bool {
+    let st = app.state::<AppState>();
+    let (ids, name) = if kind == "song" {
+        let Ok(tid) = id.parse::<i64>() else { return false };
+        match db::track(&st.db.lock(), tid).ok().flatten() {
+            Some(t) => (vec![t.id], t.title),
+            None => return false,
+        }
+    } else {
+        let random = st.random.read().clone();
+        match library::collection(&st.db.lock(), kind, id, &random) {
+            Ok(c) if !c.tracks.is_empty() => (c.tracks.iter().map(|t| t.id).collect(), c.title),
+            _ => return false,
+        }
+    };
+    if shuffle && !st.player.queue.lock().shuffle {
+        let mut s = st.settings.read().clone();
+        s.shuffle = true;
+        let _ = set_settings(app.clone(), app.state::<AppState>(), s);
+        let _ = app.emit("settings://changed", ());
+    }
+    let start = if shuffle { (db::now() as usize) % ids.len() } else { 0 };
+    play_tracks(app.clone(), app.state::<AppState>(), ids, start, name).is_ok()
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]

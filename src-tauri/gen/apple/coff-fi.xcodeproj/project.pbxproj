@@ -8,25 +8,30 @@
 
 /* Begin PBXBuildFile section */
 		0A56B45913A5989D4B7FB2A6 /* CoreAudio.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 25648F62078EDB68E389F8AA /* CoreAudio.framework */; };
+		1E24E43FC0D35B4DF8AC370F /* AppIntents.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 86C0E76A3C495B0941B70B3A /* AppIntents.framework */; };
 		331AF64B96A08B6FFE9BC7F6 /* WebKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 215259957CCABE4373AEA80D /* WebKit.framework */; };
 		467858494CAC5E8EC870F89F /* AVFoundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = FCE9499AE3E58DD1FA1DD886 /* AVFoundation.framework */; };
 		5C486D588AB9A8345D9E8C4A /* AudioToolbox.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = E0B3C5CA70D75C5E5AF57AD6 /* AudioToolbox.framework */; };
+		6A89E3E6620F9AA95CCFE66E /* Intents.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = F74C02830AB941CC91B42250 /* Intents.framework */; };
 		72464B33FE5C0DF3849C802F /* libapp.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 7EF7463D715DD6DBC0A85065 /* libapp.a */; };
 		7FD189C7792229C5626EBD4C /* CoreGraphics.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = CABA56FF3321BF1CFC47EC4F /* CoreGraphics.framework */; };
 		8B80B432BEEC2393649CDE0D /* assets in Resources */ = {isa = PBXBuildFile; fileRef = 924133B3EE4CEA56F617278A /* assets */; };
 		9398244AB96A5FA45A8B2027 /* Security.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 24362A8515B02F9954E96652 /* Security.framework */; };
 		9F3EF9AF5FEC4391A84D388C /* QuartzCore.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = F5C24EBE00D133CC30D45116 /* QuartzCore.framework */; };
+		AFF5E851716C2B8D59D2BB6A /* SiriSupport.swift in Sources */ = {isa = PBXBuildFile; fileRef = E2A47D1A765DE59FACE19154 /* SiriSupport.swift */; };
 		B747C26F170C92E78DF2D0B3 /* CoffiNative.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A49ECB8B1F4F44C636DD760 /* CoffiNative.swift */; };
 		BB00ABD0003E78B00E6BF70F /* Metal.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 5F35ECA50E2E1B7426B8D487 /* Metal.framework */; };
 		C3E4E379B1269B2A204ABB96 /* MetalKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 4C943084606DC33497598514 /* MetalKit.framework */; };
 		DA9B22778C81D6B671CFFB57 /* UIKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 5BE3AC4CFBF53BEFBF9D0095 /* UIKit.framework */; };
 		E05F327F27606E1CFBA3B2CF /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 4916C8A7AE79078FF4440706 /* Assets.xcassets */; };
 		E4D4A98EC43BCEC591638927 /* MediaPlayer.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 1F14FB0AC305D91A3A4B2C8A /* MediaPlayer.framework */; };
+		EC49DF103DC726B5A1D460CA /* CoreSpotlight.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 035D857FDCEF2EA6936A8B8F /* CoreSpotlight.framework */; };
 		EDEC1B614CEA8C6EB57C22F5 /* main.mm in Sources */ = {isa = PBXBuildFile; fileRef = 4EBE1EF68E8A024C79B64212 /* main.mm */; };
 		EF9BD38F4250A3E84E8A8B3D /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = F69FB1FCFE09D51FF6109B7D /* LaunchScreen.storyboard */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
+		035D857FDCEF2EA6936A8B8F /* CoreSpotlight.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CoreSpotlight.framework; path = System/Library/Frameworks/CoreSpotlight.framework; sourceTree = SDKROOT; };
 		08C6F97E8A54C4BB9A495FB5 /* db.rs */ = {isa = PBXFileReference; path = db.rs; sourceTree = "<group>"; };
 		0A49ECB8B1F4F44C636DD760 /* CoffiNative.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CoffiNative.swift; sourceTree = "<group>"; };
 		0F93E3D60E016C4F8AACBE1F /* lib.rs */ = {isa = PBXFileReference; path = lib.rs; sourceTree = "<group>"; };
@@ -51,6 +56,7 @@
 		721538A7899080A864DC5B59 /* tags.rs */ = {isa = PBXFileReference; path = tags.rs; sourceTree = "<group>"; };
 		7EF7463D715DD6DBC0A85065 /* libapp.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; path = libapp.a; sourceTree = "<group>"; };
 		8274403D0A54F8DAC2FD61A3 /* watch.rs */ = {isa = PBXFileReference; path = watch.rs; sourceTree = "<group>"; };
+		86C0E76A3C495B0941B70B3A /* AppIntents.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = AppIntents.framework; path = System/Library/Frameworks/AppIntents.framework; sourceTree = SDKROOT; };
 		912415D7014546E0B9D7537D /* settings.rs */ = {isa = PBXFileReference; path = settings.rs; sourceTree = "<group>"; };
 		924133B3EE4CEA56F617278A /* assets */ = {isa = PBXFileReference; lastKnownFileType = folder; path = assets; sourceTree = SOURCE_ROOT; };
 		94870145BFBF8D86BAEAC36B /* mod.rs */ = {isa = PBXFileReference; path = mod.rs; sourceTree = "<group>"; };
@@ -70,10 +76,12 @@
 		E0B3C5CA70D75C5E5AF57AD6 /* AudioToolbox.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = AudioToolbox.framework; path = System/Library/Frameworks/AudioToolbox.framework; sourceTree = SDKROOT; };
 		E15B08620A742D63CC7BDF1B /* main.rs */ = {isa = PBXFileReference; path = main.rs; sourceTree = "<group>"; };
 		E165F126CC7AFFD6F92A7F18 /* covers.rs */ = {isa = PBXFileReference; path = covers.rs; sourceTree = "<group>"; };
+		E2A47D1A765DE59FACE19154 /* SiriSupport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SiriSupport.swift; sourceTree = "<group>"; };
 		EC5F49460C65E475B17862F5 /* eq.rs */ = {isa = PBXFileReference; path = eq.rs; sourceTree = "<group>"; };
 		F5C24EBE00D133CC30D45116 /* QuartzCore.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = QuartzCore.framework; path = System/Library/Frameworks/QuartzCore.framework; sourceTree = SDKROOT; };
 		F69FB1FCFE09D51FF6109B7D /* LaunchScreen.storyboard */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; path = LaunchScreen.storyboard; sourceTree = "<group>"; };
 		F6E52BD1AD398E4306E7514A /* native.rs */ = {isa = PBXFileReference; path = native.rs; sourceTree = "<group>"; };
+		F74C02830AB941CC91B42250 /* Intents.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Intents.framework; path = System/Library/Frameworks/Intents.framework; sourceTree = SDKROOT; };
 		F8CD1CCD1D733840FA4D0974 /* decoder.rs */ = {isa = PBXFileReference; path = decoder.rs; sourceTree = "<group>"; };
 		F9360C462066B2E75568FD03 /* coff-fi_iOS.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = "coff-fi_iOS.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 		FCE9499AE3E58DD1FA1DD886 /* AVFoundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = AVFoundation.framework; path = System/Library/Frameworks/AVFoundation.framework; sourceTree = SDKROOT; };
@@ -94,6 +102,9 @@
 				331AF64B96A08B6FFE9BC7F6 /* WebKit.framework in Frameworks */,
 				467858494CAC5E8EC870F89F /* AVFoundation.framework in Frameworks */,
 				E4D4A98EC43BCEC591638927 /* MediaPlayer.framework in Frameworks */,
+				1E24E43FC0D35B4DF8AC370F /* AppIntents.framework in Frameworks */,
+				6A89E3E6620F9AA95CCFE66E /* Intents.framework in Frameworks */,
+				EC49DF103DC726B5A1D460CA /* CoreSpotlight.framework in Frameworks */,
 				5C486D588AB9A8345D9E8C4A /* AudioToolbox.framework in Frameworks */,
 				0A56B45913A5989D4B7FB2A6 /* CoreAudio.framework in Frameworks */,
 			);
@@ -136,10 +147,13 @@
 		2A1D7D2E94B34FB5F140FBED /* Frameworks */ = {
 			isa = PBXGroup;
 			children = (
+				86C0E76A3C495B0941B70B3A /* AppIntents.framework */,
 				E0B3C5CA70D75C5E5AF57AD6 /* AudioToolbox.framework */,
 				FCE9499AE3E58DD1FA1DD886 /* AVFoundation.framework */,
 				25648F62078EDB68E389F8AA /* CoreAudio.framework */,
 				CABA56FF3321BF1CFC47EC4F /* CoreGraphics.framework */,
+				035D857FDCEF2EA6936A8B8F /* CoreSpotlight.framework */,
+				F74C02830AB941CC91B42250 /* Intents.framework */,
 				7EF7463D715DD6DBC0A85065 /* libapp.a */,
 				1F14FB0AC305D91A3A4B2C8A /* MediaPlayer.framework */,
 				5F35ECA50E2E1B7426B8D487 /* Metal.framework */,
@@ -203,6 +217,7 @@
 			children = (
 				143834D80A888140861C9412 /* CoffiBridge.h */,
 				0A49ECB8B1F4F44C636DD760 /* CoffiNative.swift */,
+				E2A47D1A765DE59FACE19154 /* SiriSupport.swift */,
 			);
 			path = Native;
 			sourceTree = "<group>";
@@ -381,6 +396,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				B747C26F170C92E78DF2D0B3 /* CoffiNative.swift in Sources */,
+				AFF5E851716C2B8D59D2BB6A /* SiriSupport.swift in Sources */,
 				EDEC1B614CEA8C6EB57C22F5 /* main.mm in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;

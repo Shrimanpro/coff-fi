@@ -40,6 +40,7 @@ final class CoffiNative: NSObject {
         configureSession()
         observeLifecycle()
         FolderAccess.restore()
+        SiriSupport.install()
         WebViewTuning.applyWhenReady()
         OrientationControl.install()
     }
@@ -178,6 +179,7 @@ final class CoffiNative: NSObject {
         switch request {
         case "pick_folder": FolderAccess.pick(exclude: false)
         case "pick_exclude": FolderAccess.pick(exclude: true)
+        case "refresh_shortcuts": SiriSupport.refresh()
         default: NSLog("Coff-fi: unknown native request \(request)")
         }
     }

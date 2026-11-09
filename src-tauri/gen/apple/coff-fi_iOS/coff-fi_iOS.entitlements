@@ -2,5 +2,8 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+	<!-- Add <key>com.apple.developer.siri</key><true/> and set CoffiSiriKit: true in project.yml
+	     when signing with a paid Apple Developer account. App Intents (the "… in Coff-fi" Siri
+	     phrases) work without it. -->
 </dict>
 </plist>

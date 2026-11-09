@@ -14,7 +14,7 @@ typedef struct {
     // JSON {title, artist, album, duration, cover} or NULL when nothing is loaded.
     void (*now_playing)(const char *json);
     void (*playback)(bool has_track, bool playing, double position, double rate);
-    // "pick_folder" | "pick_exclude"
+    // "pick_folder" | "pick_exclude" | "refresh_shortcuts"
     void (*request)(const char *what);
 } CoffiCallbacks;
 
@@ -26,6 +26,12 @@ void coffi_lifecycle(const char *event);
 void coffi_folder_picked(const char *path);
 // Default name shown to other Coff-fi devices on the network.
 void coffi_set_device_name(const char *name);
+
+bool coffi_ready(void);
+// JSON array of {kind, id, name, subtitle}; free with coffi_string_free.
+char *coffi_find(const char *kind, const char *query);
+bool coffi_play(const char *kind, const char *id, bool shuffle);
+void coffi_string_free(char *s);
 
 // Implemented in Swift (CoffiNative.swift); called from main.mm before the app starts.
 void coffi_native_install(void);

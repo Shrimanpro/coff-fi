@@ -22,6 +22,16 @@
 	<string>0.8.0</string>
 	<key>CFBundleVersion</key>
 	<string>0.8.0</string>
+	<key>CoffiSiriKit</key>
+	<false/>
+	<key>INIntentsSupported</key>
+	<array>
+		<string>INPlayMediaIntent</string>
+	</array>
+	<key>INSupportedMediaCategories</key>
+	<array>
+		<string>INMediaCategoryMusic</string>
+	</array>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
 	<key>LSSupportsOpeningDocumentsInPlace</key>
@@ -32,6 +42,8 @@
 	</array>
 	<key>NSLocalNetworkUsageDescription</key>
 	<string>Coff-fi connects to your Navidrome server and to Coff-fi on your other devices, so you can control playback from one to the other.</string>
+	<key>NSSiriUsageDescription</key>
+	<string>Coff-fi uses Siri so you can play your playlists, albums, artists and songs by voice.</string>
 	<key>UIBackgroundModes</key>
 	<array>
 		<string>audio</string>
