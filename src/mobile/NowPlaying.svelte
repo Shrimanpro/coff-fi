@@ -1,6 +1,6 @@
 <script lang="ts">
   // Full-screen Now Playing sheet: Apple Music layout (reference A) with reference B's extras
-  // (codec/source line, sleep timer). Three modes share the bottom controls:
+  // (codec/source line, sleep timer, AirPlay). Three modes share the bottom controls:
   // artwork, synced lyrics, and the queue.
   import { onMount, tick } from "svelte";
   import Cover from "../components/Cover.svelte";
@@ -8,6 +8,7 @@
   import Lyrics from "../components/Lyrics.svelte";
   import Scrubber from "../components/Scrubber.svelte";
   import { quality } from "../lib/format";
+  import { haptic } from "../lib/haptics";
   import { api, blurSrc, isRemote } from "../lib/ipc";
   import RemoteBadge from "../components/RemoteBadge.svelte";
   import { remote } from "../lib/remote.svelte";
@@ -109,6 +110,7 @@
   function close(from = 0, vel = 0) {
     if (closing || !sheet) return;
     closing = true;
+    haptic("soft");
     const H = window.innerHeight;
     const rest = H - from;
     const dur = Math.round(Math.max(260, Math.min(460, rest / Math.max(vel, rest / 460))));
@@ -137,6 +139,7 @@
 
   /** Switch between artwork / lyrics / queue: the cover glides between big and thumbnail. */
   async function setMode(x: "lyrics" | "queue" | "art") {
+    haptic("selection");
     const next = x !== "art" && m.npMode === x ? "art" : x;
     if (next === m.npMode) return;
     const fromEl = artEl ?? hartEl;
@@ -152,8 +155,11 @@
     });
   }
 
-  function press(_feedback: string, fn: () => unknown) {
-    return () => fn();
+  function press(kind: Parameters<typeof haptic>[0], fn: () => unknown) {
+    return () => {
+      haptic(kind);
+      fn();
+    };
   }
 
   const source = $derived(remote.target ? `On ${remote.target.name}` : player.cached ? "Cache" : isRemote(t) ? "Navidrome" : "Local");
@@ -212,6 +218,7 @@
     const r = volBar.getBoundingClientRect();
     const v = Math.max(0, Math.min(1, (e.clientX - r.left) / r.width));
     const nv = Math.round(v * 100) / 100;
+    if ((nv === 0 || nv === 1) && nv !== volume()) haptic("rigid");
     setVolume(nv);
   }
 
@@ -232,6 +239,7 @@
   async function sleep(mode: "off" | "minutes" | "end_of_track", minutes?: number) {
     try {
       player.sleep = await api.sleepTimer(mode, minutes);
+      haptic(mode === "off" ? "light" : "success");
       now = Date.now();
       toast(mode === "off" ? "Sleep timer off" : mode === "end_of_track" ? "Playback will stop after this song" : `Playback will pause in ${minutes} minutes`);
     } catch (e) {
@@ -281,7 +289,7 @@
             <div class="title ellipsis">{t.title}</div>
             <button class="artist ellipsis" onclick={() => goArtist(t)}>{t.artist}</button>
           </div>
-          <button class="round" class:on={player.fav} aria-label="Favorite" onclick={() => toggleFav(t)}><span class="pop" class:popped={player.fav}><Icon name={player.fav ? "star-fill" : "star"} size={20} /></span></button>
+          <button class="round" class:on={player.fav} aria-label="Favorite" onclick={() => (haptic(player.fav ? "light" : "success"), toggleFav(t))}><span class="pop" class:popped={player.fav}><Icon name={player.fav ? "star-fill" : "star"} size={20} /></span></button>
           <button class="round" aria-label="More" onclick={press("light", () => trackSheet(t))}><Icon name="more" size={20} /></button>
         </div>
       {:else}
@@ -291,7 +299,7 @@
             <div class="title ellipsis">{t.title}</div>
             <button class="artist ellipsis" onclick={() => goArtist(t)}>{t.artist}</button>
           </div>
-          <button class="round" class:on={player.fav} aria-label="Favorite" onclick={() => toggleFav(t)}><span class="pop" class:popped={player.fav}><Icon name={player.fav ? "star-fill" : "star"} size={19} /></span></button>
+          <button class="round" class:on={player.fav} aria-label="Favorite" onclick={() => (haptic(player.fav ? "light" : "success"), toggleFav(t))}><span class="pop" class:popped={player.fav}><Icon name={player.fav ? "star-fill" : "star"} size={19} /></span></button>
           <button class="round" aria-label="More" onclick={press("light", () => trackSheet(t))}><Icon name="more" size={19} /></button>
         </div>
         <div class="pane">
@@ -327,6 +335,7 @@
             aria-valuemax={1}
             aria-valuenow={volume()}
             onpointerdown={(e) => {
+              haptic("selection");
               volDrag = true;
               volBar?.setPointerCapture(e.pointerId);
               setVol(e);
@@ -340,6 +349,9 @@
         </div>
         <div class="tools">
           <button class="tool" class:on={mode === "lyrics"} aria-label="Lyrics" onclick={() => setMode("lyrics")}><Icon name="lyrics" size={22} /></button>
+          {#if !remote.target}
+            <button class="tool" aria-label="AirPlay" onclick={press("light", () => api.nativeRequest("airplay").catch((e) => toast(String(e))))}><Icon name="airplay" size={22} /></button>
+          {/if}
           <button class="tool" class:on={!!remote.target} aria-label="Play on another device" onclick={press("light", () => (remote.picker = true))}><Icon name="devices" size={22} /></button>
           <button class="tool" class:on={player.sleep.mode !== "off"} aria-label="Sleep timer" onclick={press("light", sleepSheet)}>
             <Icon name="sleep" size={22} />

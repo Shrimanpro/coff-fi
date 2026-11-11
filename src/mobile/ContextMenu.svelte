@@ -3,6 +3,7 @@
   // own position (nudged up if the menu needs room) and the menu springs open beside it.
   import Cover from "../components/Cover.svelte";
   import Icon from "../components/Icon.svelte";
+  import { haptic } from "../lib/haptics";
   import { m, type ContextMenu } from "./nav.svelte";
 
   const ROW_H = 48;
@@ -62,6 +63,7 @@
   }
 
   function pick(action: () => void) {
+    haptic("selection");
     close();
     // Run right away so playback starts while the menu fades.
     action();

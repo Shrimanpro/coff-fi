@@ -2,6 +2,7 @@
   // iOS-style bottom action sheet; replaces the desktop right-click menus.
   import { fade, fly } from "svelte/transition";
   import Icon from "../components/Icon.svelte";
+  import { haptic } from "../lib/haptics";
   import { m } from "./nav.svelte";
 
   const close = () => (m.sheet = null);
@@ -19,7 +20,7 @@
         </div>
       {/if}
       {#each s.items as it (it.label)}
-        <button class="item" class:danger={it.danger} role="menuitem" onclick={() => (close(), it.action())}>
+        <button class="item" class:danger={it.danger} role="menuitem" onclick={() => (haptic("selection"), close(), it.action())}>
           <span>{it.label}</span>
           {#if it.icon}<Icon name={it.icon} size={19} />{/if}
         </button>

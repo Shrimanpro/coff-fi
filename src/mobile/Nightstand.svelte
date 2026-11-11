@@ -9,6 +9,7 @@
   import Lyrics from "../components/Lyrics.svelte";
   import Scrubber from "../components/Scrubber.svelte";
   import Transport from "../components/Transport.svelte";
+  import { haptic } from "../lib/haptics";
   import { api, blurSrc } from "../lib/ipc";
   import { player } from "../lib/state.svelte";
 
@@ -36,6 +37,7 @@
 
   let root: HTMLDivElement;
   onMount(() => {
+    haptic("soft");
     root.animate([{ opacity: 0, transform: "scale(1.04)" }, { opacity: 1, transform: "none" }], { duration: 480, easing: "cubic-bezier(0.22, 1, 0.36, 1)" });
     poke();
     return () => clearTimeout(idleTimer);
@@ -51,7 +53,7 @@
     <div class="shade"></div>
   </div>
 
-  <button class="close" aria-label="Close Now Playing" onclick={() => onclose()}><Icon name="chev-down" size={22} /></button>
+  <button class="close" aria-label="Close Now Playing" onclick={() => (haptic("light"), onclose())}><Icon name="chev-down" size={22} /></button>
 
   {#if t}
     <div class="layout">
@@ -61,7 +63,7 @@
         <div class="title ellipsis">{t.title}</div>
         <div class="artist ellipsis">{t.artist}</div>
         <!-- Haptic tick for any transport button (Transport is shared with desktop). -->
-        <div class="controls"><Transport big /></div>
+        <div class="controls" role="presentation" onclickcapture={() => haptic("light")}><Transport big /></div>
       </div>
       <div class="right">
         {#key t.id}

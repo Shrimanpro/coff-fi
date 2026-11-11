@@ -1,5 +1,6 @@
 <script lang="ts">
   import { time } from "../lib/format";
+  import { haptic } from "../lib/haptics";
   import { api } from "../lib/ipc";
   import { player, position } from "../lib/state.svelte";
 
@@ -45,6 +46,7 @@
     e.stopPropagation();
     bar.setPointerCapture(e.pointerId);
     drag = at(e);
+    haptic("selection");
   }
   function move(e: PointerEvent) {
     if (drag !== null) drag = at(e);
@@ -53,6 +55,7 @@
     if (drag === null) return;
     const to = at(e);
     drag = null;
+    haptic("light");
     // Optimistically jump so the bar doesn't snap back while the seek happens.
     player.status = { ...player.status, position: to };
     player.at = performance.now();

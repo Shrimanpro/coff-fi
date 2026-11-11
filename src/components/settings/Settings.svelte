@@ -261,6 +261,9 @@
         </div>
       {:else if tab === "playback"}
         <h3>Output</h3>
+        {#if ios}
+          <button class="pill-btn ghost" onclick={() => api.nativeRequest("airplay").catch((e) => toast(String(e)))}><Icon name="airplay" size={16} /> AirPlay & audio output</button>
+        {:else}
         <select
           value={s.output_device ?? ""}
           onchange={(e) => {
@@ -271,6 +274,7 @@
           <option value="">System default</option>
           {#each devices as d (d)}<option value={d}>{d}</option>{/each}
         </select>
+        {/if}
 
         <h3>Transitions</h3>
         <label class="switch"><input type="checkbox" bind:checked={s.gapless} onchange={() => saveSettings(0)} /><span></span> Gapless playback</label>

@@ -8,6 +8,7 @@
   import { tick } from "svelte";
   import Cover from "../components/Cover.svelte";
   import Icon from "../components/Icon.svelte";
+  import { haptic } from "../lib/haptics";
   import { api } from "../lib/ipc";
   import { anchors, player } from "../lib/state.svelte";
   import { m, selectTab, type TabId } from "./nav.svelte";
@@ -72,7 +73,7 @@
       role="button"
       tabindex="0"
       aria-label="Open Now Playing"
-      onclick={() => (m.nowPlaying = true)}
+      onclick={() => (haptic("light"), (m.nowPlaying = true))}
       onkeydown={(e) => e.key === "Enter" && (m.nowPlaying = true)}
     >
       <div class="art" bind:this={artEl}><Cover covers={t.cover} size={96} round /></div>
@@ -86,11 +87,11 @@
           <div class="artist ellipsis">{t.artist}</div>
         {/if}
       </div>
-      <button class="ctl" aria-label={player.status.playing ? "Pause" : "Play"} onclick={(e) => (e.stopPropagation(), api.cmd("toggle"))}>
+      <button class="ctl" aria-label={player.status.playing ? "Pause" : "Play"} onclick={(e) => (e.stopPropagation(), haptic("medium"), api.cmd("toggle"))}>
         <span class="pp" class:on={!player.status.playing}><Icon name="play" size={24} /></span>
         <span class="pp" class:on={player.status.playing}><Icon name="pause" size={24} /></span>
       </button>
-      <button class="ctl" aria-label="Next" onclick={(e) => (e.stopPropagation(), api.cmd("next"))}><Icon name="next" size={24} /></button>
+      <button class="ctl" aria-label="Next" onclick={(e) => (e.stopPropagation(), haptic("light"), api.cmd("next"))}><Icon name="next" size={24} /></button>
     </div>
   {/if}
 

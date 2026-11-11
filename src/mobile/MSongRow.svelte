@@ -6,6 +6,7 @@
   import { time } from "../lib/format";
   import { enqueueTracks, player } from "../lib/state.svelte";
   import type { Track } from "../lib/types";
+  import { haptic } from "../lib/haptics";
   import { longpress, trackMenu, trackSheet } from "./nav.svelte";
 
   let {
@@ -51,6 +52,7 @@
       const lim = (v: number) => (Math.abs(v) < TRIGGER ? v : Math.sign(v) * (TRIGGER + (Math.abs(v) - TRIGGER) * 0.35));
       const next = lim(x);
       // Tick once when the swipe crosses into (or out of) "will trigger".
+      if ((Math.abs(next) >= TRIGGER) !== (Math.abs(dx) >= TRIGGER)) haptic(Math.abs(next) >= TRIGGER ? "medium" : "light");
       dx = next;
     }
   }
@@ -60,6 +62,7 @@
     if (decided === "x") {
       if (dx >= TRIGGER) enqueueTracks([track], true);
       else if (dx <= -TRIGGER) enqueueTracks([track], false);
+      if (Math.abs(dx) >= TRIGGER) haptic("success");
       settling = true;
       dx = 0;
       setTimeout(() => {
@@ -71,6 +74,7 @@
   }
   function tap() {
     if (swiping) return;
+    haptic("light");
     onplay();
   }
 </script>

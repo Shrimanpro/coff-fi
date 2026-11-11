@@ -1,8 +1,9 @@
 // Native iOS layer for Coff-fi: audio session, lock screen / Dynamic Island Now Playing,
-// remote commands, the Files folder picker and app lifecycle.
+// remote commands, AirPlay, the Files folder picker and app lifecycle.
 // Playback itself stays in the Rust engine; this file only connects it to iOS.
 
 import AVFoundation
+import AVKit
 import MediaPlayer
 import UIKit
 import UniformTypeIdentifiers
@@ -41,6 +42,7 @@ final class CoffiNative: NSObject {
         observeLifecycle()
         FolderAccess.restore()
         SiriSupport.install()
+        Haptics.prepare()
         WebViewTuning.applyWhenReady()
         OrientationControl.install()
     }
@@ -157,6 +159,10 @@ final class CoffiNative: NSObject {
     // MARK: Requests from the web UI
 
     private func handle(request: String) {
+        if request.hasPrefix("haptic:") {
+            Haptics.play(String(request.dropFirst("haptic:".count)))
+            return
+        }
         switch request {
         case "orient:any": OrientationControl.allowLandscape(true); return
         case "orient:portrait": OrientationControl.allowLandscape(false); return
@@ -177,6 +183,7 @@ final class CoffiNative: NSObject {
         default: break
         }
         switch request {
+        case "airplay": AirPlay.showPicker()
         case "pick_folder": FolderAccess.pick(exclude: false)
         case "pick_exclude": FolderAccess.pick(exclude: true)
         case "refresh_shortcuts": SiriSupport.refresh()
@@ -213,6 +220,24 @@ enum UIHelpers {
         var vc = keyWindow?.rootViewController
         while let next = vc?.presentedViewController { vc = next }
         return vc
+    }
+}
+
+/// The system AirPlay / audio route picker, opened from the Now Playing screen.
+enum AirPlay {
+    private static var picker: AVRoutePickerView?
+
+    static func showPicker() {
+        guard let window = UIHelpers.keyWindow else { return }
+        let p = picker ?? AVRoutePickerView(frame: CGRect(x: window.bounds.midX, y: window.bounds.maxY - 80, width: 1, height: 1))
+        p.prioritizesVideoDevices = false
+        p.alpha = 0.011
+        if p.superview == nil { window.addSubview(p) }
+        picker = p
+        // AVRoutePickerView has no public "present"; tap its internal button.
+        if let button = p.subviews.compactMap({ $0 as? UIButton }).first {
+            button.sendActions(for: .touchUpInside)
+        }
     }
 }
 
@@ -257,6 +282,39 @@ final class FolderAccess: NSObject, UIDocumentPickerDelegate {
     }
 }
 
+
+/// Haptic feedback requested by the web UI ("haptic:<kind>").
+enum Haptics {
+    private static let light = UIImpactFeedbackGenerator(style: .light)
+    private static let medium = UIImpactFeedbackGenerator(style: .medium)
+    private static let heavy = UIImpactFeedbackGenerator(style: .heavy)
+    private static let soft = UIImpactFeedbackGenerator(style: .soft)
+    private static let rigid = UIImpactFeedbackGenerator(style: .rigid)
+    private static let selection = UISelectionFeedbackGenerator()
+    private static let notification = UINotificationFeedbackGenerator()
+
+    static func prepare() {
+        DispatchQueue.main.async {
+            [light, medium, soft, rigid].forEach { $0.prepare() }
+            selection.prepare()
+        }
+    }
+
+    static func play(_ kind: String) {
+        switch kind {
+        case "light": light.impactOccurred(); light.prepare()
+        case "medium": medium.impactOccurred(); medium.prepare()
+        case "heavy": heavy.impactOccurred(); heavy.prepare()
+        case "soft": soft.impactOccurred(); soft.prepare()
+        case "rigid": rigid.impactOccurred(); rigid.prepare()
+        case "selection": selection.selectionChanged(); selection.prepare()
+        case "success": notification.notificationOccurred(.success)
+        case "warning": notification.notificationOccurred(.warning)
+        case "error": notification.notificationOccurred(.error)
+        default: break
+        }
+    }
+}
 
 /// Lets the web UI render at the display's full refresh rate (120 Hz on ProMotion iPhones).
 /// WebKit throttles page rendering updates (requestAnimationFrame, JS-driven drags) to ~60 fps

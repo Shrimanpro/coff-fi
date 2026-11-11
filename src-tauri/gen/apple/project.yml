@@ -112,6 +112,7 @@ targets:
       - sdk: UIKit.framework
       - sdk: WebKit.framework
       - sdk: AVFoundation.framework
+      - sdk: AVKit.framework
       - sdk: MediaPlayer.framework
       - sdk: AppIntents.framework
       - sdk: Intents.framework

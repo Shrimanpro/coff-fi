@@ -1,5 +1,6 @@
 <script lang="ts">
   // Pick where music plays: this device or another Coff-fi on the network.
+  import { haptic } from "../lib/haptics";
   import { deviceKind, remote } from "../lib/remote.svelte";
   import { controlDevice, ui } from "../lib/state.svelte";
   import type { Device } from "../lib/types";
@@ -17,6 +18,7 @@
   const icon = (platform: string) => (platform === "ios" ? "phone" : "laptop");
 
   function pick(d: Device | null) {
+    haptic("light");
     if (remote.connecting !== null) return;
     if ((d?.id ?? null) === (remote.target?.id ?? null)) {
       remote.picker = false;

@@ -3,6 +3,7 @@
   // swipe left to remove, tap to jump; plus the saved / recent queue switcher and Save queue.
   import Cover from "../components/Cover.svelte";
   import Icon from "../components/Icon.svelte";
+  import { haptic } from "../lib/haptics";
   import { api } from "../lib/ipc";
   import { player, queue, toast } from "../lib/state.svelte";
   import type { SavedQueue } from "../lib/types";
@@ -30,16 +31,25 @@
     (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
     gy = e.clientY;
     drag = { from: i, dy: 0 };
+    haptic("medium");
   }
+  let lastOver = -1;
   function gripMove(e: PointerEvent) {
     if (!drag) return;
     drag = { ...drag, dy: e.clientY - gy };
+    // A tick for every slot the song passes, like reordering in iOS.
+    if (over !== lastOver) {
+      if (lastOver !== -1) haptic("selection");
+      lastOver = over;
+    }
   }
   function gripUp() {
     if (!drag) return;
     const { from } = drag;
     const to = over;
     drag = null;
+    lastOver = -1;
+    haptic("light");
     if (to !== from && to >= 0) api.queueEdit("move", from, to);
   }
   const offset = (i: number) => {
@@ -71,6 +81,7 @@
     }
     if (axis === "x") {
       const nx = Math.min(0, x);
+      if ((nx < -90) !== (sw.dx < -90)) haptic(nx < -90 ? "medium" : "light");
       sw = { ...sw, dx: nx };
     }
   }
@@ -80,15 +91,18 @@
     const swiped = axis === "x";
     sw = null;
     if (swiped && dx < -90) {
+      haptic("success");
       api.queueEdit("remove", i);
     }
     if (!swiped && axis === null) {
+      haptic("light");
       api.queueEdit("jump", i);
     }
     axis = null;
   }
 
   async function switcher() {
+    haptic("light");
     let qs: SavedQueue[] = [];
     try {
       qs = await api.listQueues();
@@ -116,6 +130,7 @@
     if (!n) return;
     try {
       await api.saveQueue(n);
+      haptic("success");
       toast(`Saved queue “${n}”`);
       saving = false;
       name = "";
@@ -131,7 +146,7 @@
     <div class="n ellipsis">{queue.name || "Queue"}</div>
   </div>
   <button class="qbtn" aria-label="Switch queue" onclick={switcher}><Icon name="history" size={18} /></button>
-  <button class="qbtn" class:on={saving} aria-label="Save queue" onclick={() => (saving = !saving)}><Icon name="save" size={17} /></button>
+  <button class="qbtn" class:on={saving} aria-label="Save queue" onclick={() => (haptic("selection"), (saving = !saving))}><Icon name="save" size={17} /></button>
 </div>
 
 {#if saving}

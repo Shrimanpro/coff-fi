@@ -1,6 +1,7 @@
 // Navigation for the iOS layout: four tabs, each with its own push/pop stack (like a
 // UINavigationController per tab), plus the bottom action sheet that replaces right-click menus.
 
+import { haptic } from "../lib/haptics";
 import { api } from "../lib/ipc";
 import { remote } from "../lib/remote.svelte";
 import { enqueueTile, enqueueTracks, onTargetChange, playTile, player, shufflePlay, tileTracks, toast, ui } from "../lib/state.svelte";
@@ -66,6 +67,7 @@ export function pop(): boolean {
 
 /** Tapping the active tab again pops to its root (like iOS). */
 export function selectTab(t: TabId) {
+  haptic("selection");
   if (m.tab === t) {
     m.dir = -1;
     m.stacks[t] = [];
@@ -204,6 +206,7 @@ export function longpress(node: HTMLElement, cb: (el: HTMLElement) => void) {
     }
     timer = setTimeout(() => {
       fired = true;
+      haptic("medium");
       cb(node);
       reset();
     }, PRESS_MS);

@@ -14,7 +14,7 @@ typedef struct {
     // JSON {title, artist, album, duration, cover} or NULL when nothing is loaded.
     void (*now_playing)(const char *json);
     void (*playback)(bool has_track, bool playing, double position, double rate);
-    // "pick_folder" | "pick_exclude" | "refresh_shortcuts"
+    // "airplay" | "pick_folder" | "refresh_shortcuts"
     void (*request)(const char *what);
 } CoffiCallbacks;
 
