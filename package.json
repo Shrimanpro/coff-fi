@@ -7,7 +7,8 @@
     "dev": "vite",
     "build": "vite build",
     "check": "svelte-check --tsconfig ./tsconfig.json",
-    "tauri": "tauri"
+    "tauri": "tauri",
+    "ipa:unsigned": "sh scripts/make-unsigned-ipa.sh"
   },
   "dependencies": {
     "@fontsource-variable/inter": "^5.1.0",
