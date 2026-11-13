@@ -9,9 +9,18 @@
 [![Svelte](https://img.shields.io/badge/Svelte-5-ff3e00?logo=svelte&logoColor=white)](https://svelte.dev/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-6f4e37.svg)](LICENSE)
 
-<!-- TODO: add a screenshot or demo.gif (e.g. assets/demo.gif) -->
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/home-dark.png">
+  <img src="docs/screenshots/home-light.png" alt="Coff-fi home screen" width="900">
+</picture>
 
 </div>
+
+## Screenshots
+
+| Light | Dark |
+| :---: | :---: |
+| <img src="docs/screenshots/home-light.png" alt="Home screen, light theme" width="440"> | <img src="docs/screenshots/home-dark.png" alt="Home screen, dark theme" width="440"> |
 
 ---
 
@@ -32,6 +41,7 @@ inside a Tauri 2 webview; everything that touches audio, files or the network li
 
 ## Table of Contents
 
+- [Screenshots](#screenshots)
 - [Features](#features)
 - [Known Limitations](#known-limitations)
 - [Toolchain](#toolchain)
