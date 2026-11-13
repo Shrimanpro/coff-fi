@@ -92,7 +92,24 @@ async fn bind() -> std::io::Result<TcpListener> {
 fn transient(e: &std::io::Error) -> bool {
     use std::io::ErrorKind::*;
     matches!(e.kind(), ConnectionAborted | ConnectionReset | Interrupted | WouldBlock | TimedOut)
-        || matches!(e.raw_os_error(), Some(libc::EMFILE | libc::ENFILE | libc::ENOBUFS | libc::ENOMEM))
+        || out_of_resources(e)
+}
+
+/// Running out of descriptors or buffers passes once some connections close.
+#[cfg(unix)]
+fn out_of_resources(e: &std::io::Error) -> bool {
+    matches!(e.raw_os_error(), Some(libc::EMFILE | libc::ENFILE | libc::ENOBUFS | libc::ENOMEM))
+}
+
+#[cfg(windows)]
+fn out_of_resources(e: &std::io::Error) -> bool {
+    // WSAEMFILE, WSAENOBUFS
+    matches!(e.raw_os_error(), Some(10024 | 10055))
+}
+
+#[cfg(not(any(unix, windows)))]
+fn out_of_resources(_: &std::io::Error) -> bool {
+    false
 }
 
 /// Starts listening. `on_dead` runs if the listening socket stops working, which iOS does to

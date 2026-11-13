@@ -5,6 +5,10 @@
 //! ([`client`]) and drive it: its UI forwards library, queue and playback commands
 //! ([`dispatch`]) and shows the other device's events.
 
+#[cfg(target_vendor = "apple")]
+pub mod bonjour;
+#[cfg(not(target_vendor = "apple"))]
+#[path = "mdns.rs"]
 pub mod bonjour;
 pub mod client;
 mod dispatch;
@@ -71,13 +75,18 @@ fn system_name() -> String {
             return n;
         }
     }
-    let mut buf = [0u8; 256];
-    let n = if unsafe { libc::gethostname(buf.as_mut_ptr() as *mut libc::c_char, buf.len()) } == 0 {
-        let end = buf.iter().position(|&b| b == 0).unwrap_or(buf.len());
-        String::from_utf8_lossy(&buf[..end]).trim_end_matches(".local").to_string()
-    } else {
-        String::new()
+    #[cfg(unix)]
+    let n = {
+        let mut buf = [0u8; 256];
+        if unsafe { libc::gethostname(buf.as_mut_ptr() as *mut libc::c_char, buf.len()) } == 0 {
+            let end = buf.iter().position(|&b| b == 0).unwrap_or(buf.len());
+            String::from_utf8_lossy(&buf[..end]).trim_end_matches(".local").to_string()
+        } else {
+            String::new()
+        }
     };
+    #[cfg(not(unix))]
+    let n = std::env::var("COMPUTERNAME").unwrap_or_default();
     if n.is_empty() { crate::get_platform().to_string() } else { n }
 }
 

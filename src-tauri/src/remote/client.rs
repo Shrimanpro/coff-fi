@@ -100,11 +100,7 @@ impl std::fmt::Display for Unreachable {
 impl std::error::Error for Unreachable {}
 
 fn classify(e: &std::io::Error) -> Unreachable {
-    match e.raw_os_error() {
-        Some(libc::ECONNREFUSED) => Unreachable::Refused,
-        _ if e.kind() == std::io::ErrorKind::ConnectionRefused => Unreachable::Refused,
-        _ => Unreachable::NoAnswer,
-    }
+    if e.kind() == std::io::ErrorKind::ConnectionRefused { Unreachable::Refused } else { Unreachable::NoAnswer }
 }
 
 /// Resolves `host` and connects to all its addresses at once, keeping the first that answers:
